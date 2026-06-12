@@ -1,17 +1,67 @@
-# React + Vite
+# Addaptive Learning Interface and Engagement Classifier
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Project overview
 
-Currently, two official plugins are available:
+This repository currently contains a React + Vite frontend application scaffold. The app is verified to build and run locally, but the full product backlog (backend APIs, database, machine learning, tests, and deployment config) is not yet implemented.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Current status
 
-## React Compiler
+- Frontend stack: React 19 + Vite 8
+- Verified: `npm install`, `npm run build`, `npm run dev`, `npm run lint`
+- Missing: backend, API contract, database models, ML pipeline, tests, deployment configuration
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Local setup
 
-## Expanding the ESLint configuration
+1. Install dependencies:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm install
+```
+
+2. Start the development server:
+
+```bash
+npm run dev
+```
+
+3. Open the local app in a browser:
+
+```text
+http://127.0.0.1:4173/
+```
+
+4. Build for production:
+
+```bash
+npm run build
+```
+
+5. Run lint checks:
+
+```bash
+npm run lint
+```
+
+## Verification checklist
+
+- [x] `npm install` works
+- [x] `npm run dev` starts successfully
+- [x] `npm run build` completes successfully
+- [x] `npm run lint` passes without errors
+- [ ] Add backend implementation
+- [ ] Add API service layer
+- [ ] Add database persistence
+- [ ] Add ML pipeline and model files
+- [ ] Add automated tests
+- [x] Add Vercel deployment config
+- [x] Add project-specific documentation and license
+
+## Deployment files
+
+- `vercel.json` — Vercel static build configuration
+- `.env.example` — example environment variables for local development and future backend integration
+
+## Notes for reviewers
+
+This repo is currently a frontend prototype. Use the checklist above to track next work items and to validate the local environment.
 
