@@ -11,7 +11,7 @@ function App() {
     <>
       <section id="center">
         <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
+          <img src={heroImg} className="base" width="170" height="179" alt="Adaptive learning platform hero icon" />
           <img src={reactLogo} className="framework" alt="React logo" />
           <img src={viteLogo} className="vite" alt="Vite logo" />
         </div>
@@ -41,14 +41,14 @@ function App() {
           <p>Your questions, answered</p>
           <ul>
             <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
+              <a href="https://vite.dev/" target="_blank" rel="noopener noreferrer">
+                <img className="logo" src={viteLogo} alt="Vite logo" />
                 Explore Vite
               </a>
             </li>
             <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
+              <a href="https://react.dev/" target="_blank" rel="noopener noreferrer">
+                <img className="button-icon" src={reactLogo} alt="React logo" />
                 Learn more
               </a>
             </li>
@@ -62,7 +62,7 @@ function App() {
           <p>Join the Vite community</p>
           <ul>
             <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
+              <a href="https://github.com/vitejs/vite" target="_blank" rel="noopener noreferrer">
                 <svg
                   className="button-icon"
                   role="presentation"
@@ -74,7 +74,7 @@ function App() {
               </a>
             </li>
             <li>
-              <a href="https://chat.vite.dev/" target="_blank">
+              <a href="https://chat.vite.dev/" target="_blank" rel="noopener noreferrer">
                 <svg
                   className="button-icon"
                   role="presentation"
@@ -86,7 +86,7 @@ function App() {
               </a>
             </li>
             <li>
-              <a href="https://x.com/vite_js" target="_blank">
+              <a href="https://x.com/vite_js" target="_blank" rel="noopener noreferrer">
                 <svg
                   className="button-icon"
                   role="presentation"
@@ -98,7 +98,7 @@ function App() {
               </a>
             </li>
             <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
+              <a href="https://bsky.app/profile/vite.dev" target="_blank" rel="noopener noreferrer">
                 <svg
                   className="button-icon"
                   role="presentation"
