@@ -1,13 +1,24 @@
+import { useNavigate } from 'react-router-dom'
 
 function Home() {
+  const navigate = useNavigate()
+
+  const handleGetStarted = () => {
+    navigate('/dashboard')
+  }
+
+  const handleLearnMore = () => {
+    navigate('/quiz')
+  }
+
   return (
     <div className="page home-page">
       <section className="hero-section">
         <h1>Welcome to Adaptive Learning</h1>
         <p>An intelligent learning platform that adapts to your pace</p>
         <div className="hero-buttons">
-          <button className="btn btn-primary">Get Started</button>
-          <button className="btn btn-secondary">Learn More</button>
+          <button className="btn btn-primary" onClick={handleGetStarted}>Get Started</button>
+          <button className="btn btn-secondary" onClick={handleLearnMore}>Learn More</button>
         </div>
       </section>
 
