@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react'
-import { fetchDashboardStats } from '../api'
+import { fetchDashboardStats, fetchProfile } from '../api'
 
 function Dashboard() {
   const [stats, setStats] = useState(null)
+  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    fetchDashboardStats()
-      .then(data => {
-        setStats(data)
+    Promise.all([fetchProfile(), fetchDashboardStats()])
+      .then(([profileData, statsData]) => {
+        setProfile(profileData)
+        setStats(statsData)
         setLoading(false)
       })
       .catch(err => {
@@ -36,7 +38,7 @@ function Dashboard() {
         <h1>Learning Dashboard</h1>
         <div className="quiz-container error-container">
           <p className="error-message">{error}</p>
-          <button className="btn btn-primary" onClick={() => { setLoading(true); setError(null); fetchDashboardStats().then(data=>{setStats(data); setLoading(false);}).catch(err=>{setError(err.message); setLoading(false);}) }}>Retry</button>
+          <button className="btn btn-primary" onClick={() => { setLoading(true); setError(null); Promise.all([fetchProfile(), fetchDashboardStats()]).then(([p, s])=>{setProfile(p); setStats(s); setLoading(false);}).catch(err=>{setError(err.message); setLoading(false);}) }}>Retry</button>
         </div>
       </div>
     )
@@ -70,7 +72,26 @@ function Dashboard() {
 
   return (
     <div className="page dashboard-page">
-      <h1>Learning Dashboard</h1>
+      <div className="dashboard-header-container">
+        <h1>Welcome Back, {profile?.first_name || "Student"}!</h1>
+        <p className="dashboard-subtitle">Here is your customized learning progress summary.</p>
+        
+        {profile && (
+          <div className="profile-quick-stats">
+            <span className="profile-quick-badge">
+              <strong>Goal:</strong> {profile.weekly_goal} hrs/week
+            </span>
+            <span className="profile-quick-badge">
+              <strong>Focus:</strong> {profile.subject_focus}
+            </span>
+            {profile.enable_reminders && (
+              <span className="profile-quick-badge reminders-active">
+                🔔 Reminders Active
+              </span>
+            )}
+          </div>
+        )}
+      </div>
       
       <div className="dashboard-grid">
         <div className="stat-card">

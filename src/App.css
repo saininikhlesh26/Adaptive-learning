@@ -755,3 +755,87 @@
     gap: 1rem;
   }
 }
+
+/* Navbar Profile Badge & Avatar Styles */
+.nav-profile-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: white;
+  text-decoration: none;
+  font-weight: 500;
+  transition: opacity 0.3s;
+}
+
+.nav-profile-badge:hover {
+  opacity: 0.9;
+}
+
+.nav-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  object-fit: cover;
+}
+
+/* Dashboard Header & Custom Greeting Styles */
+.dashboard-header-container {
+  text-align: left;
+  margin-bottom: 2.5rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 1.5rem;
+}
+
+.dashboard-header-container h1 {
+  font-size: 2.2rem;
+  color: #333;
+  margin: 0;
+  letter-spacing: -0.8px;
+}
+
+.dashboard-subtitle {
+  color: #718096;
+  font-size: 1.05rem;
+  margin-top: 0.3rem;
+}
+
+.profile-quick-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.2rem;
+}
+
+.profile-quick-badge {
+  background: #f7fafc;
+  border: 1px solid #e2e8f0;
+  color: #4a5568;
+  padding: 0.4rem 0.9rem;
+  border-radius: 30px;
+  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.profile-quick-badge strong {
+  margin-right: 0.25rem;
+  color: #2d3748;
+}
+
+.profile-quick-badge.reminders-active {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+
+/* Metrics Grid for Profile Page Setup */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
+}
+
+.flex-1 {
+  flex: 1;
+}

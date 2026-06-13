@@ -20,3 +20,6 @@ class ProfileUpdateRequest(BaseModel):
     learning_style: Optional[str] = "Visual Learner"
     preferred_pace: Optional[str] = "Moderate pace"
     peak_time: Optional[str] = "Evenings (6 PM - 9 PM)"
+    weekly_goal: Optional[int] = 10
+    subject_focus: Optional[str] = "React & FastAPI Fullstack"
+    enable_reminders: Optional[bool] = True

@@ -17,6 +17,9 @@ function Profile() {
   const [preferredPace, setPreferredPace] = useState('')
   const [peakTime, setPeakTime] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
+  const [weeklyGoal, setWeeklyGoal] = useState(10)
+  const [subjectFocus, setSubjectFocus] = useState('React & FastAPI Fullstack')
+  const [enableReminders, setEnableReminders] = useState(true)
 
   useEffect(() => {
     Promise.all([fetchProfile(), fetchDashboardStats()])
@@ -32,6 +35,9 @@ function Profile() {
         setPreferredPace(profileData.preferred_pace)
         setPeakTime(profileData.peak_time)
         setAvatarUrl(profileData.avatar_url || 'https://via.placeholder.com/120')
+        setWeeklyGoal(profileData.weekly_goal || 10)
+        setSubjectFocus(profileData.subject_focus || 'React & FastAPI Fullstack')
+        setEnableReminders(profileData.enable_reminders !== undefined ? profileData.enable_reminders : true)
 
         setLoading(false)
       })
@@ -54,7 +60,10 @@ function Profile() {
       learning_style: learningStyle,
       preferred_pace: preferredPace,
       peak_time: peakTime,
-      avatar_url: avatarUrl
+      avatar_url: avatarUrl,
+      weekly_goal: parseInt(weeklyGoal, 10),
+      subject_focus: subjectFocus,
+      enable_reminders: enableReminders
     }
 
     updateProfile(payload)
@@ -65,6 +74,9 @@ function Profile() {
         }))
         setIsEditing(false)
         setSaving(false)
+        
+        // Notify App.jsx root that profile changed, updating navbar in real-time!
+        window.dispatchEvent(new Event('profile-updated'))
       })
       .catch(err => {
         console.error(err)
@@ -136,32 +148,71 @@ function Profile() {
 
             <section className="engagement-metrics-edit">
               <h2>Learning Configurations</h2>
+              <div className="form-group-inline">
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>Learning Style</label>
+                  <input
+                    type="text"
+                    value={learningStyle}
+                    onChange={(e) => setLearningStyle(e.target.value)}
+                    className="form-input"
+                  />
+                </div>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>Preferred Pace</label>
+                  <input
+                    type="text"
+                    value={preferredPace}
+                    onChange={(e) => setPreferredPace(e.target.value)}
+                    className="form-input"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group-inline">
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>Peak Performance Time</label>
+                  <input
+                    type="text"
+                    value={peakTime}
+                    onChange={(e) => setPeakTime(e.target.value)}
+                    className="form-input"
+                  />
+                </div>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>Weekly Goal (hours)</label>
+                  <input
+                    type="number"
+                    value={weeklyGoal}
+                    onChange={(e) => setWeeklyGoal(e.target.value)}
+                    min="1"
+                    max="168"
+                    className="form-input"
+                  />
+                </div>
+              </div>
+
               <div className="form-group">
-                <label>Learning Style</label>
+                <label>Subject Focus Area</label>
                 <input
                   type="text"
-                  value={learningStyle}
-                  onChange={(e) => setLearningStyle(e.target.value)}
+                  value={subjectFocus}
+                  onChange={(e) => setSubjectFocus(e.target.value)}
                   className="form-input"
                 />
               </div>
-              <div className="form-group">
-                <label>Preferred Pace</label>
-                <input
-                  type="text"
-                  value={preferredPace}
-                  onChange={(e) => setPreferredPace(e.target.value)}
-                  className="form-input"
-                />
-              </div>
-              <div className="form-group">
-                <label>Peak Performance Time</label>
-                <input
-                  type="text"
-                  value={peakTime}
-                  onChange={(e) => setPeakTime(e.target.value)}
-                  className="form-input"
-                />
+
+              <div className="form-group form-checkbox-group">
+                <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={enableReminders}
+                    onChange={(e) => setEnableReminders(e.target.checked)}
+                    className="form-checkbox"
+                    style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: '0.95rem', color: '#4a5568' }}>Enable real-time focus notifications & reminders during quizzes</span>
+                </label>
               </div>
             </section>
 
@@ -220,18 +271,32 @@ function Profile() {
             )}
 
             <section className="engagement-metrics">
-              <h2>Engagement Metrics</h2>
-              <div className="metric-card">
-                <h3>Learning Style</h3>
-                <p>{profile.learning_style}</p>
-              </div>
-              <div className="metric-card">
-                <h3>Preferred Pace</h3>
-                <p>{profile.preferred_pace}</p>
-              </div>
-              <div className="metric-card">
-                <h3>Peak Performance Time</h3>
-                <p>{profile.peak_time}</p>
+              <h2>Engagement & Setup Configurations</h2>
+              <div className="metrics-grid">
+                <div className="metric-card">
+                  <h3>Learning Style</h3>
+                  <p>{profile.learning_style}</p>
+                </div>
+                <div className="metric-card">
+                  <h3>Preferred Pace</h3>
+                  <p>{profile.preferred_pace}</p>
+                </div>
+                <div className="metric-card">
+                  <h3>Peak Performance Time</h3>
+                  <p>{profile.peak_time}</p>
+                </div>
+                <div className="metric-card">
+                  <h3>Weekly Goal</h3>
+                  <p>{profile.weekly_goal} hours</p>
+                </div>
+                <div className="metric-card">
+                  <h3>Subject Focus Area</h3>
+                  <p>{profile.subject_focus}</p>
+                </div>
+                <div className="metric-card">
+                  <h3>Focus Alerts Status</h3>
+                  <p>{profile.enable_reminders ? "🔔 Active Reminders" : "🔕 Muted"}</p>
+                </div>
               </div>
             </section>
 
