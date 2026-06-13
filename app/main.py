@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 from app.database import seed_database
-from app.routers import quiz, stats, profile
+from app.routers import quiz, stats, profile, subjects, competitions
 
 load_dotenv()
 
@@ -18,8 +18,8 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For ease of development, allow all origins
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow any origin to communicate in public/preview deployments
+    allow_credentials=False,  # Bearer token auth in headers does not require cookies/credentials flags
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -40,7 +40,9 @@ def read_root():
         "endpoints": {
             "quizzes": "/api/quizzes",
             "stats": "/api/dashboard/stats",
-            "profile": "/api/profile"
+            "profile": "/api/profile",
+            "subjects": "/api/subjects",
+            "competitions": "/api/competitions"
         }
     }
 
@@ -48,6 +50,8 @@ def read_root():
 app.include_router(quiz.router)
 app.include_router(stats.router)
 app.include_router(profile.router)
+app.include_router(subjects.router)
+app.include_router(competitions.router)
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))

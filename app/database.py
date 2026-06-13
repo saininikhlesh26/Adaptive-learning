@@ -17,7 +17,6 @@ class MockCursor:
     def sort(self, key, direction=1):
         reverse = True if direction == -1 else False
         sort_key = key
-        # Handle list of tuples like [("timestamp", -1)]
         if isinstance(key, list) and len(key) > 0:
             sort_key = key[0][0]
             reverse = True if key[0][1] == -1 else False
@@ -46,7 +45,12 @@ class MockCollection:
             match = True
             if filter_dict:
                 for k, v in filter_dict.items():
-                    if doc.get(k) != v:
+                    # Support dictionary subset matching or direct comparison
+                    if isinstance(v, dict) and "$in" in v:
+                        if doc.get(k) not in v["$in"]:
+                            match = False
+                            break
+                    elif doc.get(k) != v:
                         match = False
                         break
             if match:
@@ -84,7 +88,6 @@ class MockCollection:
         set_data = update_dict.get("$set", {})
         doc = self.find_one(filter_dict)
         if doc:
-            # Locate document by reference and update
             for i, d in enumerate(self.data):
                 match = True
                 for k, v in filter_dict.items():
@@ -99,15 +102,31 @@ class MockCollection:
             new_doc.update(set_data)
             self.insert_one(new_doc)
 
+    def delete_one(self, filter_dict):
+        for i, d in enumerate(self.data):
+            match = True
+            for k, v in filter_dict.items():
+                if d.get(k) != v:
+                    match = False
+                    break
+            if match:
+                self.data.pop(i)
+                return True
+        return False
+
 class MockDatabase:
     def __init__(self):
         self.quizzes = MockCollection("quizzes")
         self.submissions = MockCollection("submissions")
         self.users = MockCollection("users")
+        self.subjects = MockCollection("subjects")
+        self.competitions = MockCollection("competitions")
         self._collections = {
             "quizzes": self.quizzes,
             "submissions": self.submissions,
-            "users": self.users
+            "users": self.users,
+            "subjects": self.subjects,
+            "competitions": self.competitions
         }
 
     def __getitem__(self, name):
@@ -123,7 +142,6 @@ IS_MOCK = False
 try:
     print(f"Connecting to database: {DATABASE_NAME} using {MONGODB_URI.split('@')[-1]}")
     client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=1500)
-    # Ping database to force link validation
     client.admin.command('ping')
     db = client[DATABASE_NAME]
     print("Database connection verified. Running in production/live mode.")
@@ -138,164 +156,263 @@ def get_db():
 
 def seed_database():
     """
-    Checks if the quizzes collection is empty. If it is, seeds standard quizzes.
-    Works for both real MongoDB collections and the in-memory MockDatabase.
+    Checks collections and seeds:
+    - Subjects (Math, Physics, Chemistry, Computer Science, English)
+    - Quizzes associated with each subject
+    - Default student user profile
+    - A few historical quiz submissions to populate statistics
     """
-    # Seeding for Mock mode is handled here if empty
-    # Seeding for live Mongo is handled here too
+    # 1. Seed Subjects
+    subjects_collection = db["subjects"]
+    if subjects_collection.count_documents({}) == 0:
+        print("Seeding subjects...")
+        subjects_collection.insert_many([
+            {"id": "math", "title": "Mathematics", "description": "Calculus, algebra, and geometry concepts."},
+            {"id": "physics", "title": "Physics", "description": "Mechanics, electromagnetism, and thermodynamics."},
+            {"id": "chemistry", "title": "Chemistry", "description": "Organic, inorganic, and physical chemistry basics."},
+            {"id": "comp_sci", "title": "Computer Science", "description": "Data structures, algorithms, and web programming."},
+            {"id": "english", "title": "English", "description": "Grammar rules, sentence structures, and analysis."}
+        ])
+
+    # 2. Seed Quizzes
     quizzes_collection = db["quizzes"]
+    if quizzes_collection.count_documents({}) == 0:
+        print("Seeding quizzes...")
+        sample_quizzes = [
+            # Computer Science Quizzes
+            {
+                "quiz_id": "react_basics",
+                "title": "React Basics",
+                "difficulty": "Easy",
+                "subject_id": "comp_sci",
+                "description": "Learn the foundational concepts of React, components, and rendering.",
+                "questions": [
+                    {
+                        "question": "What is the primary purpose of React?",
+                        "options": ["Build server-side databases", "Build user interfaces with reusable components", "Manage backend routing", "Style elements using static sheets"],
+                        "correct": 1,
+                        "hint": "React is a library created by Facebook for frontend building.",
+                        "explanation": "React focuses strictly on UI component rendering."
+                    },
+                    {
+                        "question": "What is JSX?",
+                        "options": ["HTML++", "JSX", "JavaScript XML", "JSON-CSS"],
+                        "correct": 1,
+                        "hint": "It looks like HTML but is written inside JavaScript.",
+                        "explanation": "JSX allows writing HTML-like code inside JavaScript."
+                    },
+                    {
+                        "question": "How are properties passed into React components?",
+                        "options": ["Through local state", "Through props", "Through global context", "Through url search parameters"],
+                        "correct": 1,
+                        "hint": "Short for properties.",
+                        "explanation": "Props (properties) pass read-only parameters down to child components."
+                    }
+                ]
+            },
+            {
+                "quiz_id": "react_hooks",
+                "title": "React Hooks Deep Dive",
+                "difficulty": "Medium",
+                "subject_id": "comp_sci",
+                "description": "Master functional component state, side effects, and custom hooks.",
+                "questions": [
+                    {
+                        "question": "What does the useState hook do?",
+                        "options": ["Fetches API data automatically", "Adds state variables to functional components", "Injects CSS rules into components", "Navigates between screens"],
+                        "correct": 1,
+                        "hint": "Used to track local variables that trigger re-renders.",
+                        "explanation": "useState creates a local getter and setter pair inside functional components."
+                    },
+                    {
+                        "question": "Which hook is used to handle side-effects like data fetching?",
+                        "options": ["useReducer", "useCallback", "useEffect", "useMemo"],
+                        "correct": 2,
+                        "hint": "Runs after render phase is finished.",
+                        "explanation": "useEffect runs side-effects like APIs, event listeners, and timers."
+                    }
+                ]
+            },
+            # Math Quizzes
+            {
+                "quiz_id": "algebra_basics",
+                "title": "Basic Algebra & Equations",
+                "difficulty": "Easy",
+                "subject_id": "math",
+                "description": "Linear equations, simplifying expressions, and standard variables.",
+                "questions": [
+                    {
+                        "question": "Solve for x: 3x + 5 = 17",
+                        "options": ["x = 2", "x = 4", "x = 6", "x = 8"],
+                        "correct": 1,
+                        "hint": "Subtract 5 from both sides, then divide by 3.",
+                        "explanation": "3x = 12, so x = 12 / 3 = 4."
+                    }
+                ]
+            },
+            {
+                "quiz_id": "calculus_intro",
+                "title": "Introduction to Derivatives",
+                "difficulty": "Hard",
+                "subject_id": "math",
+                "description": "Limits, derivatives rules, and rates of change.",
+                "questions": [
+                    {
+                        "question": "What is the derivative of x^2 + 3x with respect to x?",
+                        "options": ["2x", "2x + 3", "x + 3", "2x^2 + 3"],
+                        "correct": 1,
+                        "hint": "Use the power rule: d/dx(x^n) = n*x^(n-1).",
+                        "explanation": "d/dx(x^2) = 2x, and d/dx(3x) = 3. Summing them yields 2x + 3."
+                    }
+                ]
+            },
+            # Physics Quizzes
+            {
+                "quiz_id": "mechanics_force",
+                "title": "Newtonian Force Laws",
+                "difficulty": "Medium",
+                "subject_id": "physics",
+                "description": "Mass, acceleration, gravity, and momentum.",
+                "questions": [
+                    {
+                        "question": "What is Newton's Second Law of Motion?",
+                        "options": ["F = m/a", "F = m*a", "F = m*v", "F = m*a^2"],
+                        "correct": 1,
+                        "hint": "Force equals mass times acceleration.",
+                        "explanation": "Newton's second law is F = ma (Force = Mass * Acceleration)."
+                    }
+                ]
+            },
+            # Chemistry Quizzes
+            {
+                "quiz_id": "periodic_table",
+                "title": "Periodic Table Elements",
+                "difficulty": "Easy",
+                "subject_id": "chemistry",
+                "description": "Atomic numbers, hydrogen, and noble gases.",
+                "questions": [
+                    {
+                        "question": "What is the chemical symbol for Gold?",
+                        "options": ["Go", "Gd", "Au", "Ag"],
+                        "correct": 2,
+                        "hint": "Comes from the Latin word Aurum.",
+                        "explanation": "Au represents gold on the periodic table."
+                    }
+                ]
+            },
+            # English Quizzes
+            {
+                "quiz_id": "grammar_tense",
+                "title": "English Verb Tenses",
+                "difficulty": "Easy",
+                "subject_id": "english",
+                "description": "Present perfect, past simple, and future conditional.",
+                "questions": [
+                    {
+                        "question": "Choose the correct sentence form:",
+                        "options": ["She has went to school.", "She went to school yesterday.", "She has go to school.", "She gone to school."],
+                        "correct": 1,
+                        "hint": "Simple past does not require has.",
+                        "explanation": "'She went to school yesterday' is correct past simple tense."
+                    }
+                ]
+            }
+        ]
+        quizzes_collection.insert_many(sample_quizzes)
+
+    # 3. Seed Submissions (Quiz Attempts) to Populate Stats
+    submissions_collection = db["submissions"]
+    if submissions_collection.count_documents({}) == 0:
+        print("Seeding submissions/attempts...")
+        # Seed 4 historical quiz submissions
+        now = datetime.datetime.now(datetime.timezone.utc)
+        sample_submissions = [
+            {
+                "user_id": "default_student",
+                "quiz_id": "react_basics",
+                "quiz_title": "React Basics",
+                "score": 3,
+                "total": 3,
+                "score_ratio": 1.0,
+                "percentage": 100.0,
+                "engagement_level": "Focused",
+                "confidence": 92.5,
+                "is_fallback": True,
+                "behavioral_metrics": {"time_spent": 85.0, "tab_switches": 0, "mouse_clicks": 18, "inactivity_duration": 4.0},
+                "timestamp": (now - datetime.timedelta(days=4)).isoformat()
+            },
+            {
+                "user_id": "default_student",
+                "quiz_id": "algebra_basics",
+                "quiz_title": "Basic Algebra",
+                "score": 1,
+                "total": 1,
+                "score_ratio": 1.0,
+                "percentage": 100.0,
+                "engagement_level": "Focused",
+                "confidence": 88.0,
+                "is_fallback": True,
+                "behavioral_metrics": {"time_spent": 50.0, "tab_switches": 0, "mouse_clicks": 10, "inactivity_duration": 2.0},
+                "timestamp": (now - datetime.timedelta(days=3)).isoformat()
+            },
+            {
+                "user_id": "default_student",
+                "quiz_id": "mechanics_force",
+                "quiz_title": "Newtonian Force Laws",
+                "score": 0,
+                "total": 1,
+                "score_ratio": 0.0,
+                "percentage": 0.0,
+                "engagement_level": "Struggling",
+                "confidence": 76.5,
+                "is_fallback": True,
+                "behavioral_metrics": {"time_spent": 240.0, "tab_switches": 1, "mouse_clicks": 45, "inactivity_duration": 18.0},
+                "timestamp": (now - datetime.timedelta(days=2)).isoformat()
+            },
+            {
+                "user_id": "default_student",
+                "quiz_id": "react_hooks",
+                "quiz_title": "React Hooks Deep Dive",
+                "score": 1,
+                "total": 2,
+                "score_ratio": 0.5,
+                "percentage": 50.0,
+                "engagement_level": "Bored",
+                "confidence": 70.0,
+                "is_fallback": True,
+                "behavioral_metrics": {"time_spent": 40.0, "tab_switches": 5, "mouse_clicks": 8, "inactivity_duration": 25.0},
+                "timestamp": (now - datetime.timedelta(days=1)).isoformat()
+            }
+        ]
+        submissions_collection.insert_many(sample_submissions)
+
+    # 4. Seed User Profile
+    users_collection = db["users"]
+    if users_collection.count_documents({"user_id": "default_student"}) == 0:
+        print("Seeding profile...")
+        users_collection.insert_one({
+            "user_id": "default_student",
+            "first_name": "John",
+            "last_name": "Doe",
+            "email": "john.doe@example.com",
+            "avatar_url": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
+            "learning_style": "Visual Learner with strong problem-solving abilities",
+            "preferred_pace": "Moderate pace with occasional deep dives",
+            "peak_time": "Evenings (6 PM - 9 PM)",
+            "weekly_goal": 10,
+            "subject_focus": "Computer Science",
+            "enable_reminders": True,
+            "joined_date": "January 2026"
+        })
     
-    if quizzes_collection.count_documents({}) > 0:
-        print("Database already contains quizzes. Skipping seeding.")
-        return
+    # 5. Seed Competitions
+    competitions_collection = db["competitions"]
+    if competitions_collection.count_documents({}) == 0:
+        print("Seeding competitions...")
+        competitions_collection.insert_many([
+            {"id": "comp_1", "title": "Daily React Challenge", "type": "Daily Challenge", "subject": "Computer Science", "participant_count": 42, "active": True},
+            {"id": "comp_2", "title": "Weekly Physics Cup", "type": "Weekly Challenge", "subject": "Physics", "participant_count": 128, "active": True},
+            {"id": "comp_3", "title": "Mathematics League", "type": "Subject Challenge", "subject": "Mathematics", "participant_count": 85, "active": False}
+        ])
         
-    print("Database quizzes collection is empty. Seeding default quizzes...")
-    
-    sample_quizzes = [
-        {
-            "quiz_id": "react_basics",
-            "title": "React Basics",
-            "difficulty": "Easy",
-            "description": "Learn the foundational concepts of React, components, and rendering.",
-            "questions": [
-                {
-                    "question": "What is the primary purpose of React?",
-                    "options": ["Build server-side databases", "Build user interfaces with reusable components", "Manage backend network routing", "Style elements using static sheets"],
-                    "correct": 1
-                },
-                {
-                    "question": "What is the name of the syntax extension used in React?",
-                    "options": ["HTML++", "JSX", "JavaScript XML", "JSON-CSS"],
-                    "correct": 1
-                },
-                {
-                    "question": "How are properties passed into React components?",
-                    "options": ["Through local state", "Through props", "Through global context", "Through url search parameters"],
-                    "correct": 1
-                }
-            ]
-        },
-        {
-            "quiz_id": "react_hooks",
-            "title": "React Hooks Deep Dive",
-            "difficulty": "Medium",
-            "description": "Master functional component state, side effects, and custom hooks.",
-            "questions": [
-                {
-                    "question": "What does the useState hook do?",
-                    "options": ["Fetches API data automatically", "Adds state variables to functional components", "Injects CSS rules into components", "Navigates between screens"],
-                    "correct": 1
-                },
-                {
-                    "question": "Which hook is used to handle side-effects like data fetching?",
-                    "options": ["useReducer", "useCallback", "useEffect", "useMemo"],
-                    "correct": 2
-                },
-                {
-                    "question": "What must we supply as the second argument to useEffect to run it only once on mount?",
-                    "options": ["A clean-up function", "An empty dependency array []", "A timeout delay in milliseconds", "The parent component element"],
-                    "correct": 1
-                },
-                {
-                    "question": "What is a major rule of React Hooks?",
-                    "options": ["Call hooks inside loops or conditions", "Call hooks only at the top level of functional components", "Use hooks inside class component constructors", "Only declare hooks with let variables"],
-                    "correct": 1
-                }
-            ]
-        },
-        {
-            "quiz_id": "react_patterns",
-            "title": "Advanced React Design Patterns",
-            "difficulty": "Hard",
-            "description": "Study compound components, render props, higher-order components, and performance optimizations.",
-            "questions": [
-                {
-                    "question": "What design pattern allows sharing state and logic among children implicitly?",
-                    "options": ["Higher-Order Components", "Compound Components Pattern", "Singleton Pattern", "Module Pattern"],
-                    "correct": 1
-                },
-                {
-                    "question": "Which hook helps optimize performance by memoizing computed values?",
-                    "options": ["useRef", "useEffect", "useMemo", "useCallback"],
-                    "correct": 2
-                },
-                {
-                    "question": "In React 18 and 19, what does Suspense do?",
-                    "options": ["Pauses page script execution", "Lets components show fallback UI until they finish loading", "Stops rendering if errors are caught", "Manages user scroll throttling"],
-                    "correct": 1
-                }
-            ]
-        },
-        {
-            "quiz_id": "state_management",
-            "title": "State Management & Context API",
-            "difficulty": "Medium",
-            "description": "Manage global state, propagate theme data, and use state containers.",
-            "questions": [
-                {
-                    "question": "What React feature allows passing state down without manual prop-drilling?",
-                    "options": ["React Router", "Context API", "useReducer", "Ref forwarding"],
-                    "correct": 1
-                },
-                {
-                    "question": "Which hook is best suited as an alternative to useState for complex nested state transitions?",
-                    "options": ["useContext", "useTransition", "useReducer", "useLayoutEffect"],
-                    "correct": 2
-                },
-                {
-                    "question": "What is a main concept of Redux state flow?",
-                    "options": ["Mutating global state directly", "Unidirectional data flow with actions and reducers", "Using local component props for all state", "Bi-directional bindings on form inputs"],
-                    "correct": 1
-                }
-            ]
-        },
-        {
-            "quiz_id": "web_dev_intro",
-            "title": "Introduction to Web Development",
-            "difficulty": "Easy",
-            "description": "Basics of the web, HTML tags, CSS styling, and basic JavaScript.",
-            "questions": [
-                {
-                    "question": "Which HTML tag is used for the largest main heading on a page?",
-                    "options": ["<h6>", "<head>", "<h1>", "<header>"],
-                    "correct": 2
-                },
-                {
-                    "question": "What does CSS stand for?",
-                    "options": ["Computer Style Sheets", "Cascading Style Sheets", "Creative Style Styling", "Complex Sheet Standards"],
-                    "correct": 1
-                },
-                {
-                    "question": "Which DOM method is used to select an element by its ID?",
-                    "options": ["document.selectById()", "document.getElementById()", "document.querySelector('#id')", "Both B and C are correct"],
-                    "correct": 3
-                }
-            ]
-        },
-        {
-            "quiz_id": "fastapi_basics",
-            "title": "Python FastAPI Fundamentals",
-            "difficulty": "Medium",
-            "description": "Introduction to Python FastAPI routers, request validation using Pydantic, and asyncio.",
-            "questions": [
-                {
-                    "question": "What library does FastAPI use for data validation and parsing?",
-                    "options": ["Flask", "Django", "Pydantic", "Marshmallow"],
-                    "correct": 2
-                },
-                {
-                    "question": "How do you start a FastAPI server named main.py with app = FastAPI()?",
-                    "options": ["python main.py", "uvicorn main:app --reload", "fastapi run main", "gunicorn app:main --reload"],
-                    "correct": 1
-                },
-                {
-                    "question": "What HTTP method is standard for creating resource objects?",
-                    "options": ["GET", "PUT", "POST", "DELETE"],
-                    "correct": 2
-                }
-            ]
-        }
-    ]
-    
-    quizzes_collection.insert_many(sample_quizzes)
-    print(f"Successfully seeded {len(sample_quizzes)} quizzes.")
+    print("Database seeding completed.")
