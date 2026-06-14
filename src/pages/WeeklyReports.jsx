@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { fetchWeeklyReports, generateWeeklyReport } from '../api'
 
 export default function WeeklyReports() {
@@ -9,9 +9,11 @@ export default function WeeklyReports() {
   const [copySuccess, setCopySuccess] = useState(false)
   const [generating, setGenerating] = useState(false)
 
-  const loadReports = async (selectLatest = true) => {
+  const loadReports = async (selectLatest = true, showLoader = false) => {
     try {
-      setLoading(true)
+      if (showLoader) {
+        setLoading(true)
+      }
       const data = await fetchWeeklyReports()
       // Sort reports by date descending
       const sorted = data.sort((a, b) => new Date(b.week_end) - new Date(a.week_end))
@@ -29,8 +31,10 @@ export default function WeeklyReports() {
   }
 
   useEffect(() => {
-    loadReports()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadReports(true, false)
   }, [])
+
 
   const handleReportChange = (e) => {
     const report = reports.find(r => r.id === e.target.value)

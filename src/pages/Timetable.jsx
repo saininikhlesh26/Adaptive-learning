@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { 
   fetchTimetable, 
   fetchSubjects, 
@@ -26,9 +26,11 @@ export default function Timetable() {
   const [priority, setPriority] = useState('Medium')
   const [submitting, setSubmitting] = useState(false)
 
-  const loadData = async () => {
+  const loadData = async (showLoader = false) => {
     try {
-      setLoading(true)
+      if (showLoader) {
+        setLoading(true)
+      }
       const [schedData, subjData] = await Promise.all([
         fetchTimetable(),
         fetchSubjects()
@@ -46,8 +48,10 @@ export default function Timetable() {
   }
 
   useEffect(() => {
-    loadData()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadData(false)
   }, [])
+
 
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to remove this study slot?')) {

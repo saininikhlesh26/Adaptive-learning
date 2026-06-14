@@ -309,6 +309,24 @@ const MOCK_ACHIEVEMENTS = [
 ];
 
 
+const MOCK_COMPETITIONS = [
+  { id: 'comp_1', title: 'Daily React Challenge', type: 'Daily Challenge', subject: 'Web Development', participant_count: 42, active: true },
+  { id: 'comp_2', title: 'Weekly Physics Cup', type: 'Weekly Challenge', subject: 'Physics', participant_count: 128, active: true },
+  { id: 'comp_3', title: 'Mathematics League', type: 'Subject Challenge', subject: 'Mathematics', participant_count: 85, active: false }
+];
+
+const MOCK_LEADERBOARDS = {
+  comp_1: [
+    { rank: 1, name: 'Alice Smith', score: 950, engagement_score: 98.0 },
+    { rank: 2, name: 'Bob Johnson', score: 880, engagement_score: 85.0 },
+    { rank: 3, name: 'John Doe (You)', score: 750, engagement_score: 60.0 }
+  ],
+  comp_2: [
+    { rank: 1, name: 'Charlie Brown', score: 1200, engagement_score: 95.0 },
+    { rank: 2, name: 'Alice Smith', score: 1050, engagement_score: 90.0 }
+  ]
+};
+
 // --- AUTHENTICATION API ---
 
 export async function login(email, password) {
@@ -787,7 +805,6 @@ export async function generateAiTimetable(hours) {
     }
     
     // Generate new AI items
-    const now = new Date();
     const newItems = [
       {
         id: `time_ai_${Date.now()}_1`,

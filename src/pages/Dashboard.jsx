@@ -26,12 +26,10 @@ function Dashboard() {
   const [quickTaskTitle, setQuickTaskTitle] = useState('')
   const [subjects, setSubjects] = useState([])
 
-  useEffect(() => {
-    loadDashboardData()
-  }, [])
-
-  const loadDashboardData = () => {
-    setLoading(true)
+  const loadDashboardData = (showLoader = false) => {
+    if (showLoader) {
+      setLoading(true)
+    }
     setError(null)
 
     Promise.all([
@@ -65,6 +63,13 @@ function Dashboard() {
         setLoading(false)
       })
   }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadDashboardData(false)
+  }, [])
+
+
 
   // --- SKELETON LOADERS RENDERING (Phase 1) ---
   if (loading) {
