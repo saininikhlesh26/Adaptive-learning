@@ -1,5 +1,26 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+// --- JWT Token Management ---
+
+let cachedToken = localStorage.getItem('adaptive_token') || null;
+
+export function setToken(token) {
+  cachedToken = token;
+  if (token) {
+    localStorage.setItem('adaptive_token', token);
+  } else {
+    localStorage.removeItem('adaptive_token');
+  }
+}
+
+export function getToken() {
+  return cachedToken || localStorage.getItem('adaptive_token');
+}
+
+export function isAuthenticated() {
+  return !!getToken();
+}
+
 // --- Resilience Helpers (Timeout & Retries) ---
 
 async function delay(ms) {
@@ -10,8 +31,18 @@ async function fetchWithRetry(url, options = {}, retries = 2, backoff = 1000) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 12000); // 12-second timeout
 
+  const headers = {
+    ...options.headers,
+  };
+  
+  const token = getToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const config = {
     ...options,
+    headers,
     signal: controller.signal,
   };
 
@@ -19,14 +50,23 @@ async function fetchWithRetry(url, options = {}, retries = 2, backoff = 1000) {
     const response = await fetch(url, config);
     clearTimeout(timeoutId);
 
+    if (response.status === 401) {
+      // Token might be invalid or expired. Clear session.
+      setToken(null);
+    }
+
     if (!response.ok) {
-      throw new Error(`HTTP error: status ${response.status}`);
+      const errorText = await response.text().catch(() => '');
+      let errorJson;
+      try { errorJson = JSON.parse(errorText); } catch(e) {}
+      const msg = errorJson?.detail || `HTTP error: status ${response.status}`;
+      throw new Error(msg);
     }
     return await response.json();
   } catch (error) {
     clearTimeout(timeoutId);
 
-    if (retries > 0) {
+    if (retries > 0 && error.message.includes('HTTP error') === false && error.status !== 401 && error.status !== 403) {
       console.warn(`Fetch failed for ${url}. Retrying in ${backoff}ms... (${retries} attempts left). Error:`, error.message);
       await delay(backoff);
       return fetchWithRetry(url, options, retries - 1, backoff * 2);
@@ -38,114 +78,136 @@ async function fetchWithRetry(url, options = {}, retries = 2, backoff = 1000) {
 // --- Local Browser Fallbacks (if Backend is offline) ---
 
 const MOCK_SUBJECTS = [
-  { id: 'math', title: 'Mathematics', description: 'Calculus, algebra, and geometry concepts.', quiz_count: 3, avg_score: 88, completions: 12 },
-  { id: 'physics', title: 'Physics', description: 'Mechanics, electromagnetism, and thermodynamics.', quiz_count: 2, avg_score: 76, completions: 6 },
-  { id: 'chemistry', title: 'Chemistry', description: 'Organic, inorganic, and physical chemistry basics.', quiz_count: 2, avg_score: 82, completions: 5 },
-  { id: 'comp_sci', title: 'Computer Science', description: 'Data structures, algorithms, and web programming.', quiz_count: 4, avg_score: 91, completions: 15 },
-  { id: 'english', title: 'English', description: 'Grammar rules, sentence structures, and analysis.', quiz_count: 1, avg_score: 95, completions: 8 }
+  { id: 'math', title: 'Mathematics', description: 'Calculus, algebra, and geometry concepts.', category: 'Academic', quiz_count: 5, avg_score: 88, completions: 2, is_bookmarked: true },
+  { id: 'python', title: 'Python', description: 'List comprehensions, decorators, and libraries.', category: 'Programming', quiz_count: 5, avg_score: 90, completions: 1, is_bookmarked: false },
+  { id: 'data_structures', title: 'Data Structures', description: 'Arrays, linked lists, trees, graphs, sorting.', category: 'Data Science', quiz_count: 5, avg_score: 50, completions: 1, is_bookmarked: true },
+  { id: 'react', title: 'React', description: 'State, props, hooks, virtual DOM, routing.', category: 'Web Development', quiz_count: 0, avg_score: 0, completions: 0, is_bookmarked: false }
 ];
 
 const MOCK_QUIZZES = [
   {
-    quiz_id: 'react_basics',
-    title: 'React Basics',
-    difficulty: 'Easy',
-    subject_id: 'comp_sci',
-    description: 'Learn the foundational concepts of React, components, and rendering.',
+    quiz_id: 'math_q1',
+    title: 'Mathematics: Algebra Foundations',
+    difficulty: 'Beginner',
+    subject_id: 'math',
+    description: 'Solve equations and work with variables.',
     questions: [
-      { question: 'What is the primary purpose of React?', options: ['Build server-side databases', 'Build user interfaces with reusable components', 'Manage backend network routing', 'Style elements using static sheets'], correct: 1, hint: 'React is a library created by Facebook for frontend building.', explanation: 'React focuses strictly on UI component rendering.' },
-      { question: 'What is the name of the syntax extension used in React?', options: ['HTML++', 'JSX', 'JavaScript XML', 'JSON-CSS'], correct: 1, hint: 'It looks like HTML but is written inside JavaScript.', explanation: 'JSX allows writing HTML-like code inside JavaScript.' },
-      { question: 'How are properties passed into React components?', options: ['Through local state', 'Through props', 'Through global context', 'Through url search parameters'], correct: 1, hint: 'Short for properties.', explanation: 'Props (properties) pass read-only parameters down to child components.' }
+      { question: 'Solve for x: x - 15 = 25. What is the value of x?', options: ['40', '36', '50', '80'], correct: 0, type: 'MCQ', hint: 'Add 15 to both sides.', explanation: 'x = 25 + 15 = 40.' },
+      { question: 'Is the product of two odd numbers always odd?', options: ['True', 'False'], correct: 0, type: 'True/False', hint: 'Try 3 * 5.', explanation: 'Yes, odd * odd = odd.' },
+      { question: 'Select all numbers that are factors of 12:', options: ['2', '3', '5', '8'], correct: [0, 1], type: 'Multi-select', hint: 'Check divisibility.', explanation: '2 and 3 divide 12.' }
     ]
   },
   {
-    quiz_id: 'react_hooks',
-    title: 'React Hooks Deep Dive',
-    difficulty: 'Medium',
-    subject_id: 'comp_sci',
-    description: 'Master functional component state, side effects, and custom hooks.',
+    quiz_id: 'python_q1',
+    title: 'Python: Syntax & Data Structures',
+    difficulty: 'Beginner',
+    subject_id: 'python',
+    description: 'Syntax, lists, tuples, and conditions.',
     questions: [
-      { question: 'What does the useState hook do?', options: ['Fetches API data automatically', 'Adds state variables to functional components', 'Injects CSS rules into components', 'Navigates between screens'], correct: 1, hint: 'Used to track local variables that trigger re-renders.', explanation: 'useState creates a local getter and setter pair inside functional components.' },
-      { question: 'Which hook is used to handle side-effects like data fetching?', options: ['useReducer', 'useCallback', 'useEffect', 'useMemo'], correct: 2, hint: 'Runs after render phase is finished.', explanation: 'useEffect runs side-effects like APIs, event listeners, and timers.' }
+      { question: 'What is the output of: [x for x in [1, 2, 3] if x > 1]?', options: ['[2, 3]', '[1, 2, 3]', '[3]', '[]'], correct: 0, type: 'MCQ', hint: 'Filter items > 1.', explanation: '2 and 3 are greater than 1.' },
+      { question: 'Are lists in Python hashable and usable as dictionary keys?', options: ['True', 'False'], correct: 1, type: 'True/False', hint: 'Are lists mutable?', explanation: 'No, lists are mutable and therefore unhashable.' }
     ]
   }
 ];
 
 const MOCK_STATS = {
-  lessons_completed: 24,
-  streak_days: 7,
-  engagement_score: 85,
-  average_score: 92,
-  weekly_progress: [
-    { day: 'Mon', completed: 2 },
-    { day: 'Tue', completed: 4 },
-    { day: 'Wed', completed: 1 },
-    { day: 'Thu', completed: 3 },
-    { day: 'Fri', completed: 5 },
-    { day: 'Sat', completed: 2 },
-    { day: 'Sun', completed: 1 }
-  ],
-  subject_performance: [
-    { subject: 'Math', score: 88 },
-    { subject: 'Physics', score: 76 },
-    { subject: 'Chemistry', score: 82 },
-    { subject: 'Computer Science', score: 91 },
-    { subject: 'English', score: 95 }
-  ],
-  engagement_trends: [
-    { label: 'Week 1', score: 70 },
-    { label: 'Week 2', score: 78 },
-    { label: 'Week 3', score: 82 },
-    { label: 'Week 4', score: 85 }
-  ],
+  lessons_completed: 4,
+  streak_days: 3,
+  engagement_score: 85.0,
+  average_score: 71.7,
   recent_activity: [
-    { title: 'Completed: React Fundamentals', description: 'Today at 2:30 PM - Score: 95%', engagement: 'Focused' },
-    { title: 'Completed: State Management', description: 'Yesterday at 3:15 PM - Score: 88%', engagement: 'Focused' },
-    { title: 'Completed: Component Lifecycle', description: '2 days ago at 4:00 PM - Score: 91%', engagement: 'Focused' }
+    { title: 'Completed: Mathematics: Algebra Foundations', description: '2 days ago - Score: 15/20 (75%)', engagement: 'Focused' },
+    { title: 'Completed: Python: Syntax & Data Structures', description: '3 days ago - Score: 18/20 (90%)', engagement: 'Focused' }
   ],
-  achievements: [
-    { id: '1', title: 'Focus Master', description: 'Maintained "Focused" status for 5 consecutive quizzes.', icon: '🎯' },
-    { id: '2', title: 'Perfect Score', description: 'Scored 100% on any Hard level assessment.', icon: '🏆' },
-    { id: '3', title: 'Streak Builder', description: 'Learned for 7 consecutive days.', icon: '🔥' }
+  weekly_progress: [
+    { day: 'Mon', completed: 1 },
+    { day: 'Tue', completed: 0 },
+    { day: 'Wed', completed: 2 },
+    { day: 'Thu', completed: 1 },
+    { day: 'Fri', completed: 0 },
+    { day: 'Sat', completed: 0 },
+    { day: 'Sun', completed: 0 }
+  ],
+  subject_progress: [
+    { subject: 'Mathematics', completed: 1, avg_score: 75.0 },
+    { subject: 'Python', completed: 1, avg_score: 90.0 },
+    { subject: 'Data Structures', completed: 1, avg_score: 50.0 }
+  ],
+  performance_trends: [
+    { attempt: 1, quiz_title: 'Algebra Foundations', score: 75.0, engagement: 'Focused' },
+    { attempt: 2, quiz_title: 'Syntax & Data Structures', score: 90.0, engagement: 'Focused' },
+    { attempt: 3, quiz_title: 'Arrays & Linked Lists', score: 50.0, engagement: 'Struggling' }
   ]
 };
 
 const MOCK_PROFILE = {
-  user_id: 'default_student',
+  user_id: 'usr_student_adaptive_com',
   first_name: 'John',
   last_name: 'Doe',
-  email: 'john.doe@example.com',
+  email: 'student@adaptive.com',
   avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
-  learning_style: 'Visual Learner with strong problem-solving abilities',
-  preferred_pace: 'Moderate pace with occasional deep dives',
+  learning_style: 'Visual Learner',
+  preferred_pace: 'Moderate pace',
   peak_time: 'Evenings (6 PM - 9 PM)',
   weekly_goal: 10,
   subject_focus: 'Computer Science',
   enable_reminders: true,
-  joined_date: 'January 2026'
+  learning_interests: ['math', 'python', 'data_structures'],
+  learning_goals: 'Master core computational algorithms and data systems.',
+  joined_date: 'January 2026',
+  role: 'student',
+  bookmarks: ['math', 'data_structures']
 };
 
-const MOCK_COMPETITIONS = [
-  { id: 'comp_1', title: 'Daily React Challenge', type: 'Daily Challenge', subject: 'Computer Science', participant_count: 42, active: true },
-  { id: 'comp_2', title: 'Weekly Physics Cup', type: 'Weekly Challenge', subject: 'Physics', participant_count: 128, active: true },
-  { id: 'comp_3', title: 'Mathematics League', type: 'Subject Challenge', subject: 'Mathematics', participant_count: 85, active: false }
-];
-
-const MOCK_LEADERBOARDS = {
-  comp_1: [
-    { rank: 1, name: 'Alice Smith', score: 100, engagement_score: 98 },
-    { rank: 2, name: 'John Doe (You)', score: 95, engagement_score: 92 },
-    { rank: 3, name: 'Bob Johnson', score: 88, engagement_score: 85 },
-    { rank: 4, name: 'Charlie Brown', score: 75, engagement_score: 60 }
-  ],
-  comp_2: [
-    { rank: 1, name: 'Sarah Connor', score: 98, engagement_score: 95 },
-    { rank: 2, name: 'John Doe (You)', score: 88, engagement_score: 84 },
-    { rank: 3, name: 'Kyle Reese', score: 85, engagement_score: 90 }
-  ]
+const MOCK_RECOMMENDATION = {
+  user_id: 'usr_student_adaptive_com',
+  weak_topics: ['Data Structures'],
+  strong_topics: ['Python'],
+  recommended_subject: 'data_structures',
+  recommended_quiz_id: 'data_structures_q1',
+  recommended_difficulty: 'Beginner',
+  reason: 'Reviewing Data Structures because your average score is currently low (50%). Setting it to Beginner with active hints to help you get back on track.',
+  timestamp: new Date().toISOString(),
+  quiz_details: { title: 'Data Structures: Arrays & Linked Lists', difficulty: 'Beginner' }
 };
 
-// --- API Implementation ---
+// --- AUTHENTICATION API ---
+
+export async function login(email, password) {
+  const result = await fetchWithRetry(`${API_BASE_URL}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password })
+  });
+  if (result.access_token) {
+    setToken(result.access_token);
+  }
+  return result;
+}
+
+export async function register(registerData) {
+  const result = await fetchWithRetry(`${API_BASE_URL}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(registerData)
+  });
+  if (result.access_token) {
+    setToken(result.access_token);
+  }
+  return result;
+}
+
+export async function logout() {
+  try {
+    await fetchWithRetry(`${API_BASE_URL}/api/auth/logout`, { method: 'POST' });
+  } catch (e) {
+    console.warn('Backend logout failed, executing local logout:', e);
+  } finally {
+    setToken(null);
+  }
+}
+
+// --- SUBJECTS API ---
 
 export async function fetchSubjects() {
   try {
@@ -153,6 +215,22 @@ export async function fetchSubjects() {
   } catch (error) {
     console.error('API Error in fetchSubjects, falling back to local mock data:', error);
     return MOCK_SUBJECTS;
+  }
+}
+
+export async function toggleBookmark(subjectId) {
+  try {
+    return await fetchWithRetry(`${API_BASE_URL}/api/subjects/${subjectId}/bookmark`, {
+      method: 'POST'
+    });
+  } catch (error) {
+    console.error('API Error in toggleBookmark, mocking locally:', error);
+    const idx = MOCK_SUBJECTS.findIndex(s => s.id === subjectId);
+    if (idx !== -1) {
+      MOCK_SUBJECTS[idx].is_bookmarked = !MOCK_SUBJECTS[idx].is_bookmarked;
+      return { status: 'success', is_bookmarked: MOCK_SUBJECTS[idx].is_bookmarked };
+    }
+    return { status: 'success', is_bookmarked: true };
   }
 }
 
@@ -167,10 +245,10 @@ export async function createSubject(subjectData) {
     console.error('API Error in createSubject, mocking locally:', error);
     const newSub = {
       ...subjectData,
-      id: `sub_${Date.now()}`,
       quiz_count: 0,
       avg_score: 0,
-      completions: 0
+      completions: 0,
+      is_bookmarked: false
     };
     MOCK_SUBJECTS.push(newSub);
     return newSub;
@@ -186,7 +264,7 @@ export async function updateSubject(subjectId, subjectData) {
     });
   } catch (error) {
     console.error('API Error in updateSubject, mocking locally:', error);
-    const idx = MOCK_SUBJECTS.findIndex(s => s.id === subjectId || s.quiz_id === subjectId);
+    const idx = MOCK_SUBJECTS.findIndex(s => s.id === subjectId);
     if (idx !== -1) {
       MOCK_SUBJECTS[idx] = { ...MOCK_SUBJECTS[idx], ...subjectData };
       return MOCK_SUBJECTS[idx];
@@ -210,71 +288,34 @@ export async function deleteSubject(subjectId) {
   }
 }
 
-export async function fetchQuizzes() {
+// --- QUIZZES API ---
+
+export async function fetchQuizzes(filters = {}) {
   try {
-    return await fetchWithRetry(`${API_BASE_URL}/api/quizzes`);
+    const params = new URLSearchParams();
+    if (filters.subject_id) params.append('subject_id', filters.subject_id);
+    if (filters.difficulty) params.append('difficulty', filters.difficulty);
+    if (filters.topic) params.append('topic', filters.topic);
+    
+    const queryStr = params.toString() ? `?${params.toString()}` : '';
+    return await fetchWithRetry(`${API_BASE_URL}/api/quizzes${queryStr}`);
   } catch (error) {
     console.error('API Error in fetchQuizzes, falling back to local mock data:', error);
+    if (filters.subject_id) {
+      return MOCK_QUIZZES.filter(q => q.subject_id === filters.subject_id);
+    }
     return MOCK_QUIZZES;
   }
 }
 
-export async function createQuiz(quizData) {
+export async function fetchQuiz(quizId) {
   try {
-    return await fetchWithRetry(`${API_BASE_URL}/api/quizzes`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(quizData)
-    });
+    return await fetchWithRetry(`${API_BASE_URL}/api/quizzes/${quizId}`);
   } catch (error) {
-    console.error('API Error in createQuiz, mocking locally:', error);
-    const newQuiz = {
-      ...quizData,
-      quiz_id: `quiz_${Date.now()}`
-    };
-    MOCK_QUIZZES.push(newQuiz);
-    
-    // Increment mock subject quiz count
-    const sub = MOCK_SUBJECTS.find(s => s.id === quizData.subject_id);
-    if (sub) sub.quiz_count += 1;
-
-    return newQuiz;
-  }
-}
-
-export async function updateQuiz(quizId, quizData) {
-  try {
-    return await fetchWithRetry(`${API_BASE_URL}/api/quizzes/${quizId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(quizData)
-    });
-  } catch (error) {
-    console.error('API Error in updateQuiz, mocking locally:', error);
-    const idx = MOCK_QUIZZES.findIndex(q => q.quiz_id === quizId);
-    if (idx !== -1) {
-      MOCK_QUIZZES[idx] = { ...MOCK_QUIZZES[idx], ...quizData };
-      return MOCK_QUIZZES[idx];
-    }
-    return quizData;
-  }
-}
-
-export async function deleteQuiz(quizId) {
-  try {
-    return await fetchWithRetry(`${API_BASE_URL}/api/quizzes/${quizId}`, {
-      method: 'DELETE'
-    });
-  } catch (error) {
-    console.error('API Error in deleteQuiz, mocking locally:', error);
-    const idx = MOCK_QUIZZES.findIndex(q => q.quiz_id === quizId);
-    if (idx !== -1) {
-      const q = MOCK_QUIZZES[idx];
-      const sub = MOCK_SUBJECTS.find(s => s.id === q.subject_id);
-      if (sub) sub.quiz_count = Math.max(0, sub.quiz_count - 1);
-      MOCK_QUIZZES.splice(idx, 1);
-    }
-    return { status: 'success', message: 'Quiz deleted' };
+    console.error('API Error in fetchQuiz, falling back to local mock data:', error);
+    const quiz = MOCK_QUIZZES.find(q => q.quiz_id === quizId);
+    if (!quiz) throw new Error('Quiz not found');
+    return quiz;
   }
 }
 
@@ -292,24 +333,47 @@ export async function submitQuiz(quizId, answers, behavioralMetrics) {
   } catch (error) {
     console.error('API Error in submitQuiz, mocking locally:', error);
     const quiz = MOCK_QUIZZES.find(q => q.quiz_id === quizId);
-    const correctCount = answers.reduce((acc, ans, idx) => {
-      if (quiz && quiz.questions[idx] && ans === quiz.questions[idx].correct) {
-        return acc + 1;
-      }
-      return acc;
-    }, 0);
-
     const total = quiz ? quiz.questions.length : answers.length;
-    const ratio = total > 0 ? correctCount / total : 0;
-    const percentage = Math.round(ratio * 100);
+    
+    let totalScore = 0;
+    
+    for (let idx = 0; idx < answers.length; idx++) {
+      if (!quiz || idx >= total) break;
+      const q = quiz.questions[idx];
+      const userAns = answers[idx];
+      const correctAns = q.correct;
+      
+      if (q.type === 'Multi-select') {
+        const correctList = Array.isArray(correctAns) ? correctAns : [correctAns];
+        const userList = Array.isArray(userAns) ? userAns : [userAns];
+        if (correctList.length > 0) {
+          let qScore = 0;
+          const pointsPerCorrect = 1.0 / correctList.length;
+          userList.forEach(choice => {
+            if (correctList.includes(choice)) {
+              qScore += pointsPerCorrect;
+            } else {
+              qScore -= pointsPerCorrect;
+            }
+          });
+          totalScore += Math.max(0, qScore);
+        }
+      } else {
+        if (userAns === correctAns) {
+          totalScore += 1;
+        }
+      }
+    }
+    
+    const percentage = Math.round((totalScore / total) * 100);
 
-    // Formulate basic rules for local mock prediction
+    // Predict engagement level
     let level = 'Focused';
     let conf = 85;
     if (behavioralMetrics.tab_switches >= 3 || behavioralMetrics.inactivity_duration >= 20) {
       level = 'Bored';
       conf = 78;
-    } else if (behavioralMetrics.time_spent > 120 && ratio < 0.6) {
+    } else if (behavioralMetrics.time_spent > 120 && (totalScore / total) < 0.6) {
       level = 'Struggling';
       conf = 82;
     }
@@ -318,12 +382,12 @@ export async function submitQuiz(quizId, answers, behavioralMetrics) {
     MOCK_STATS.lessons_completed += 1;
     MOCK_STATS.recent_activity.unshift({
       title: `Completed: ${quiz ? quiz.title : 'Quiz'}`,
-      description: `Just now - Score: ${correctCount}/${total} (${percentage}%)`,
+      description: `Just now - Score: ${totalScore.toFixed(1)}/${total} (${percentage}%)`,
       engagement: level
     });
 
     return {
-      score: correctCount,
+      score: Number(totalScore.toFixed(1)),
       total,
       percentage,
       engagement_level: level,
@@ -333,6 +397,19 @@ export async function submitQuiz(quizId, answers, behavioralMetrics) {
   }
 }
 
+// --- RECOMMENDATIONS API ---
+
+export async function fetchRecommendations() {
+  try {
+    return await fetchWithRetry(`${API_BASE_URL}/api/recommendations`);
+  } catch (error) {
+    console.error('API Error in fetchRecommendations, falling back to local mock data:', error);
+    return MOCK_RECOMMENDATION;
+  }
+}
+
+// --- DASHBOARD API ---
+
 export async function fetchDashboardStats() {
   try {
     return await fetchWithRetry(`${API_BASE_URL}/api/dashboard/stats`);
@@ -341,6 +418,8 @@ export async function fetchDashboardStats() {
     return MOCK_STATS;
   }
 }
+
+// --- PROFILE API ---
 
 export async function fetchProfile() {
   try {
@@ -365,12 +444,15 @@ export async function updateProfile(profileData) {
   }
 }
 
+// --- COMPETITIONS API ---
+
 export async function fetchCompetitions() {
   try {
     return await fetchWithRetry(`${API_BASE_URL}/api/competitions`);
   } catch (error) {
     console.error('API Error in fetchCompetitions, falling back to local mock data:', error);
-    return MOCK_COMPETITIONS;
+    const list = [...MOCK_COMPETITIONS];
+    return list;
   }
 }
 
@@ -390,9 +472,6 @@ export async function createCompetition(compData) {
       active: true
     };
     MOCK_COMPETITIONS.push(newComp);
-    MOCK_LEADERBOARDS[newComp.id] = [
-      { rank: 1, name: 'John Doe (You)', score: 0, engagement_score: 100 }
-    ];
     return newComp;
   }
 }
@@ -408,19 +487,6 @@ export async function joinCompetition(compId) {
     console.error('API Error in joinCompetition, mocking locally:', error);
     const comp = MOCK_COMPETITIONS.find(c => c.id === compId);
     if (comp) comp.participant_count += 1;
-    
-    // Add current user to mock leaderboard if not present
-    if (MOCK_LEADERBOARDS[compId]) {
-      const exists = MOCK_LEADERBOARDS[compId].some(u => u.name.includes('(You)'));
-      if (!exists) {
-        MOCK_LEADERBOARDS[compId].push({
-          rank: MOCK_LEADERBOARDS[compId].length + 1,
-          name: 'John Doe (You)',
-          score: 0,
-          engagement_score: 90
-        });
-      }
-    }
     return { status: 'success', message: 'Joined competition' };
   }
 }
@@ -431,8 +497,22 @@ export async function fetchLeaderboard(compId) {
   } catch (error) {
     console.error('API Error in fetchLeaderboard, falling back to local mock data:', error);
     return MOCK_LEADERBOARDS[compId] || [
-      { rank: 1, name: 'Alice Smith', score: 95, engagement_score: 96 },
-      { rank: 2, name: 'John Doe (You)', score: 85, engagement_score: 92 }
+      { rank: 1, name: 'Alice Smith', score: 950, engagement_score: 96.0 },
+      { rank: 2, name: 'John Doe (You)', score: 850, engagement_score: 92.0 }
     ];
   }
+}
+
+// --- ADMIN PANEL API ---
+
+export async function fetchAdminMetrics() {
+  return await fetchWithRetry(`${API_BASE_URL}/api/admin/metrics`);
+}
+
+export async function adminCreateQuiz(quizData) {
+  return await fetchWithRetry(`${API_BASE_URL}/api/admin/quizzes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(quizData)
+  });
 }
