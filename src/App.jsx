@@ -1,7 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
 import { Link, Route, BrowserRouter as Router, Routes, Navigate, useLocation } from 'react-router-dom'
 import './App.css'
-import { fetchProfile, isAuthenticated, logout } from './api'
+import { fetchProfile, isAuthenticated, logout, getToken } from './api'
 
 // Lazy load pages for performance optimization
 const Home = lazy(() => import('./pages/Home'))
@@ -85,6 +85,9 @@ function MainAppContent() {
           <Link to="/" className="nav-logo">
             <span className="logo-icon">⚡</span>
             <span className="logo-text">Adaptive AI</span>
+            {getToken() === 'local_mock_token' && (
+              <span className="badge-offline-mode">Local Mode</span>
+            )}
           </Link>
 
           {/* Desktop Navigation Links */}

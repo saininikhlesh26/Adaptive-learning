@@ -378,30 +378,150 @@ const MOCK_LEADERBOARDS = {
   ]
 };
 
+// --- LOCAL OFFLINE MODE DATABASE HELPERS ---
+
+function getLocalUsers() {
+  try {
+    return JSON.parse(localStorage.getItem('local_users') || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalUsers(users) {
+  try {
+    localStorage.setItem('local_users', JSON.stringify(users));
+  } catch (e) {
+    console.error('Failed to save local users to localStorage', e);
+  }
+}
+
+const DEFAULT_ACCOUNTS = [
+  { email: 'test@example.com', password: 'Test@123', first_name: 'Test', last_name: 'Account', role: 'student', education_level: 'Undergraduate', learning_interests: ['math', 'python'] },
+  { email: 'student@example.com', password: 'Student@123', first_name: 'Student', last_name: 'User', role: 'student', education_level: 'Undergraduate', learning_interests: ['math', 'python', 'data_structures'] },
+  { email: 'admin@example.com', password: 'Admin@123', first_name: 'Admin', last_name: 'User', role: 'admin', education_level: 'Professional', learning_interests: ['python', 'ml'] },
+  { email: 'student@adaptive.com', password: 'Password123!', first_name: 'John', last_name: 'Doe', role: 'student', education_level: 'Undergraduate', learning_interests: ['math', 'python', 'data_structures'] },
+  { email: 'admin@adaptive.com', password: 'AdminPassword123!', first_name: 'Admin', last_name: 'User', role: 'admin', education_level: 'Professional', learning_interests: ['python', 'ml'] }
+];
+
 // --- AUTHENTICATION API ---
 
 export async function login(email, password) {
-  const result = await fetchWithRetry(`${API_BASE_URL}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password })
-  });
-  if (result.access_token) {
-    setToken(result.access_token);
+  const cleanEmail = email.trim().lower();
+  try {
+    const result = await fetchWithRetry(`${API_BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: cleanEmail, password })
+    });
+    if (result.access_token) {
+      setToken(result.access_token);
+    }
+    return result;
+  } catch (error) {
+    const isConnError = error.message && (
+      error.message.includes('Unable to connect') || 
+      error.message.includes('Failed to fetch') || 
+      error.message.includes('NetworkError') || 
+      error.message.includes('Server is starting')
+    );
+    if (isConnError) {
+      console.warn('Backend connection failed. Falling back to local offline authentication.');
+      const localUsers = getLocalUsers();
+      const allUsers = [...DEFAULT_ACCOUNTS, ...localUsers];
+      
+      const foundUser = allUsers.find(u => u.email.toLowerCase() === cleanEmail);
+      if (!foundUser) {
+        throw new Error("Account does not exist", { cause: error });
+      }
+      if (foundUser.password !== password) {
+        throw new Error("Incorrect password", { cause: error });
+      }
+      
+      setToken('local_mock_token');
+      
+      Object.assign(MOCK_PROFILE, {
+        user_id: `usr_${foundUser.email.replace('@', '_').replace('.', '_')}`,
+        email: foundUser.email,
+        first_name: foundUser.first_name,
+        last_name: foundUser.last_name,
+        education_level: foundUser.education_level || 'Undergraduate',
+        learning_interests: foundUser.learning_interests || [],
+        role: foundUser.role || 'student'
+      });
+      
+      return {
+        access_token: 'local_mock_token',
+        token_type: 'bearer',
+        user: { ...MOCK_PROFILE }
+      };
+    }
+    throw error;
   }
-  return result;
 }
 
 export async function register(registerData) {
-  const result = await fetchWithRetry(`${API_BASE_URL}/api/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(registerData)
-  });
-  if (result.access_token) {
-    setToken(result.access_token);
+  const cleanEmail = registerData.email.trim().lower();
+  try {
+    const result = await fetchWithRetry(`${API_BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...registerData, email: cleanEmail })
+    });
+    if (result.access_token) {
+      setToken(result.access_token);
+    }
+    return result;
+  } catch (error) {
+    const isConnError = error.message && (
+      error.message.includes('Unable to connect') || 
+      error.message.includes('Failed to fetch') || 
+      error.message.includes('NetworkError') || 
+      error.message.includes('Server is starting')
+    );
+    if (isConnError) {
+      console.warn('Backend connection failed. Falling back to local offline registration.');
+      const localUsers = getLocalUsers();
+      const allUsers = [...DEFAULT_ACCOUNTS, ...localUsers];
+      
+      const exists = allUsers.some(u => u.email.toLowerCase() === cleanEmail);
+      if (exists) {
+        throw new Error("User with this email already registered.", { cause: error });
+      }
+      
+      const newUser = {
+        email: cleanEmail,
+        password: registerData.password,
+        first_name: registerData.first_name,
+        last_name: registerData.last_name,
+        education_level: registerData.education_level || 'Not Onboarded',
+        learning_interests: registerData.learning_interests || [],
+        role: 'student'
+      };
+      
+      localUsers.push(newUser);
+      saveLocalUsers(localUsers);
+      
+      setToken('local_mock_token');
+      
+      Object.assign(MOCK_PROFILE, {
+        user_id: `usr_${newUser.email.replace('@', '_').replace('.', '_')}`,
+        email: newUser.email,
+        first_name: newUser.first_name,
+        last_name: newUser.last_name,
+        education_level: newUser.education_level,
+        learning_interests: newUser.learning_interests,
+        role: 'student'
+      });
+      
+      return {
+        access_token: 'local_mock_token',
+        token_type: 'bearer',
+        user: { ...MOCK_PROFILE }
+      };
+    }
+    throw error;
   }
-  return result;
 }
 
 export async function logout() {

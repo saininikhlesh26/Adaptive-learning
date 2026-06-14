@@ -2864,3 +2864,16 @@ body {
   color: #ca8a04;
   font-style: italic;
 }
+
+.badge-offline-mode {
+  background-color: #fef3c7;
+  color: #d97706;
+  border: 1px solid #fcd34d;
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 12px;
+  font-weight: 700;
+  margin-left: 8px;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
