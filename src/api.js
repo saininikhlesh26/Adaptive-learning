@@ -58,7 +58,7 @@ async function fetchWithRetry(url, options = {}, retries = 2, backoff = 1000) {
     if (!response.ok) {
       const errorText = await response.text().catch(() => '');
       let errorJson;
-      try { errorJson = JSON.parse(errorText); } catch(e) {}
+      try { errorJson = JSON.parse(errorText); } catch { /* ignore */ }
       const msg = errorJson?.detail || `HTTP error: status ${response.status}`;
       throw new Error(msg);
     }
@@ -470,7 +470,7 @@ export async function fetchQuiz(quizId) {
   } catch (error) {
     console.error('API Error in fetchQuiz, falling back to local mock data:', error);
     const quiz = MOCK_QUIZZES.find(q => q.quiz_id === quizId);
-    if (!quiz) throw new Error('Quiz not found');
+    if (!quiz) throw new Error('Quiz not found', { cause: error });
     return quiz;
   }
 }

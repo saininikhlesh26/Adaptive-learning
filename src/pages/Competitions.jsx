@@ -17,9 +17,18 @@ function Competitions() {
     { name: 'Focused Guru', desc: 'Finished any competition with >95% focus.', icon: '🎯', xp: 400 }
   ]
 
-  useEffect(() => {
-    loadCompetitionsData()
-  }, [])
+  const loadLeaderboardData = (compId) => {
+    setLoadingLeaderboard(true)
+    fetchLeaderboard(compId)
+      .then(data => {
+        setLeaderboard(data)
+        setLoadingLeaderboard(false)
+      })
+      .catch(err => {
+        console.error(err)
+        setLoadingLeaderboard(false)
+      })
+  }
 
   const loadCompetitionsData = () => {
     setLoadingComps(true)
@@ -41,18 +50,12 @@ function Competitions() {
       })
   }
 
-  const loadLeaderboardData = (compId) => {
-    setLoadingLeaderboard(true)
-    fetchLeaderboard(compId)
-      .then(data => {
-        setLeaderboard(data)
-        setLoadingLeaderboard(false)
-      })
-      .catch(err => {
-        console.error(err)
-        setLoadingLeaderboard(false)
-      })
-  }
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadCompetitionsData()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [])
 
   const handleCompSelect = (compId) => {
     setSelectedCompId(compId)

@@ -15,7 +15,6 @@ const Auth = lazy(() => import('./pages/Auth'))
 const WeeklyReports = lazy(() => import('./pages/WeeklyReports'))
 const Timetable = lazy(() => import('./pages/Timetable'))
 
-
 // Protected Route Wrapper
 const ProtectedRoute = ({ children, authState }) => {
   return authState ? children : <Navigate to="/auth" replace />
@@ -33,7 +32,7 @@ const AdminRoute = ({ children, authState, profile }) => {
 function MainAppContent() {
   const [authState, setAuthState] = useState(isAuthenticated())
   const [profile, setProfile] = useState(null)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const location = useLocation()
 
   const syncAuth = () => {
@@ -53,12 +52,23 @@ function MainAppContent() {
   }
 
   useEffect(() => {
-    syncAuth()
+    const timer = setTimeout(() => {
+      syncAuth()
+    }, 0)
     window.addEventListener('profile-updated', loadProfile)
     return () => {
       window.removeEventListener('profile-updated', loadProfile)
+      clearTimeout(timer)
     }
   }, [])
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMobileMenuOpen(false)
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [location.pathname])
 
   const handleLogoutClick = async () => {
     await logout()
@@ -67,110 +77,113 @@ function MainAppContent() {
 
   const isActive = (path) => location.pathname === path ? 'active-link' : ''
 
-  // Don't show sidebar on landing page (/) or auth page (/auth)
-  const showSidebar = authState && location.pathname !== '/' && location.pathname !== '/auth'
-
   return (
-    <div className={`app-container ${showSidebar ? 'has-sidebar' : ''} ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-      {showSidebar && (
-        <aside className="sidebar glass-card">
-          <div className="sidebar-header">
-            <Link to="/dashboard" className="sidebar-logo">
-              <span className="logo-icon">⚡</span>
-              <span className="logo-text">Adaptive AI</span>
-            </Link>
-            <button 
-              className="sidebar-toggle-btn"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              title="Toggle Sidebar"
-            >
-              {sidebarCollapsed ? '❯' : '❮'}
-            </button>
-          </div>
+    <div className="app-container">
+      {/* Sticky Premium Navbar */}
+      <header className="navbar">
+        <div className="nav-container">
+          <Link to="/" className="nav-logo">
+            <span className="logo-icon">⚡</span>
+            <span className="logo-text">Adaptive AI</span>
+          </Link>
 
-          <nav className="sidebar-menu">
-            <Link to="/dashboard" className={`menu-item ${isActive('/dashboard')}`}>
-              <span className="menu-icon">📊</span>
-              <span className="menu-text">Dashboard</span>
-            </Link>
-            <Link to="/subjects" className={`menu-item ${isActive('/subjects')}`}>
-              <span className="menu-icon">📚</span>
-              <span className="menu-text">Subjects Catalog</span>
-            </Link>
-            <Link to="/quiz" className={`menu-item ${isActive('/quiz')}`}>
-              <span className="menu-icon">📝</span>
-              <span className="menu-text">Assessments</span>
-            </Link>
-            <Link to="/competitions" className={`menu-item ${isActive('/competitions')}`}>
-              <span className="menu-icon">🏆</span>
-              <span className="menu-text">Competitions</span>
-            </Link>
-            <Link to="/timetable" className={`menu-item ${isActive('/timetable')}`}>
-              <span className="menu-icon">📅</span>
-              <span className="menu-text">Study Planner</span>
-            </Link>
-            <Link to="/reports" className={`menu-item ${isActive('/reports')}`}>
-              <span className="menu-icon">📈</span>
-              <span className="menu-text">Weekly Reports</span>
-            </Link>
-            <Link to="/profile" className={`menu-item ${isActive('/profile')}`}>
-              <span className="menu-icon">👤</span>
-              <span className="menu-text">Student Profile</span>
-            </Link>
-            
-            {profile?.role === 'admin' && (
-              <Link to="/admin" className={`menu-item admin-menu-item ${isActive('/admin')}`}>
-                <span className="menu-icon">⚙️</span>
-                <span className="menu-text">Admin Panel</span>
-              </Link>
+          {/* Desktop Navigation Links */}
+          <nav className="nav-menu-desktop">
+            <Link to="/" className={`nav-link ${isActive('/')}`}>Home</Link>
+            {authState && (
+              <>
+                <Link to="/dashboard" className={`nav-link ${isActive('/dashboard')}`}>Dashboard</Link>
+                <Link to="/subjects" className={`nav-link ${isActive('/subjects')}`}>Subjects</Link>
+                <Link to="/quiz" className={`nav-link ${isActive('/quiz')}`}>Quizzes</Link>
+                <Link to="/competitions" className={`nav-link ${isActive('/competitions')}`}>Competitions</Link>
+                <Link to="/reports" className={`nav-link ${isActive('/reports')}`}>Reports</Link>
+                <Link to="/timetable" className={`nav-link ${isActive('/timetable')}`}>Timetable</Link>
+                <Link to="/profile" className={`nav-link ${isActive('/profile')}`}>Profile</Link>
+                {profile?.role === 'admin' && (
+                  <Link to="/admin" className={`nav-link admin-nav-link ${isActive('/admin')}`}>Admin</Link>
+                )}
+              </>
             )}
           </nav>
 
-          <div className="sidebar-footer">
-            <Link to="/profile" className="sidebar-profile-card">
-              <img 
-                src={profile?.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200"} 
-                alt="User avatar" 
-                className="sidebar-avatar" 
-              />
-              <div className="sidebar-user-info">
-                <p className="sidebar-username">{profile ? `${profile.first_name} ${profile.last_name.charAt(0)}.` : 'Loading...'}</p>
-                <span className="sidebar-user-role">{profile?.role === 'admin' ? 'Administrator' : 'Student'}</span>
+          {/* Auth Action Buttons */}
+          <div className="nav-actions-desktop">
+            {authState ? (
+              <div className="nav-profile-group">
+                <Link to="/profile" className="nav-profile-trigger">
+                  <img 
+                    src={profile?.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200"} 
+                    alt="Profile" 
+                    className="nav-avatar" 
+                  />
+                  <span className="nav-username">{profile ? `${profile.first_name}` : 'Student'}</span>
+                </Link>
+                <button className="btn btn-secondary btn-nav-logout" onClick={handleLogoutClick}>
+                  Sign Out
+                </button>
               </div>
-            </Link>
-            <button className="btn btn-secondary btn-logout" onClick={handleLogoutClick} title="Logout">
-              <span className="logout-icon">🚪</span>
-              <span className="menu-text">Sign Out</span>
-            </button>
-          </div>
-        </aside>
-      )}
-
-      {/* Main content wrapper */}
-      <div className="content-wrapper">
-        {!showSidebar && (
-          <nav className="navbar glass-card">
-            <div className="nav-container">
-              <Link to="/" className="nav-logo">
-                Adaptive Quiz Platform
+            ) : (
+              <Link to="/auth" className="btn btn-primary nav-login-btn">
+                Login / Register
               </Link>
-              <div className="nav-actions">
-                {authState ? (
-                  <>
-                    <Link to="/dashboard" className="btn btn-secondary nav-btn-dash">Dashboard</Link>
-                    <button className="btn btn-primary nav-btn-out" onClick={handleLogoutClick}>Sign Out</button>
-                  </>
-                ) : (
-                  <>
-                    <Link to="/" className="nav-links">Home</Link>
-                    <Link to="/auth" className="btn btn-primary nav-btn-in">Get Started</Link>
-                  </>
-                )}
-              </div>
-            </div>
-          </nav>
-        )}
+            )}
+          </div>
 
+          {/* Mobile Hamburger Button */}
+          <button 
+            className={`hamburger-btn ${mobileMenuOpen ? 'open' : ''}`}
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle menu"
+          >
+            <span className="bar"></span>
+            <span className="bar"></span>
+            <span className="bar"></span>
+          </button>
+        </div>
+
+        {/* Mobile Navigation Drawer */}
+        <div className={`mobile-drawer ${mobileMenuOpen ? 'open' : ''}`}>
+          <nav className="mobile-nav-links">
+            <Link to="/" className={`mobile-nav-link ${isActive('/')}`}>Home</Link>
+            {authState ? (
+              <>
+                <Link to="/dashboard" className={`mobile-nav-link ${isActive('/dashboard')}`}>Dashboard</Link>
+                <Link to="/subjects" className={`mobile-nav-link ${isActive('/subjects')}`}>Subjects</Link>
+                <Link to="/quiz" className={`mobile-nav-link ${isActive('/quiz')}`}>Quizzes</Link>
+                <Link to="/competitions" className={`mobile-nav-link ${isActive('/competitions')}`}>Competitions</Link>
+                <Link to="/reports" className={`mobile-nav-link ${isActive('/reports')}`}>Reports</Link>
+                <Link to="/timetable" className={`mobile-nav-link ${isActive('/timetable')}`}>Timetable</Link>
+                <Link to="/profile" className={`mobile-nav-link ${isActive('/profile')}`}>Profile</Link>
+                {profile?.role === 'admin' && (
+                  <Link to="/admin" className={`mobile-nav-link ${isActive('/admin')}`}>Admin Panel</Link>
+                )}
+                <div className="mobile-drawer-footer">
+                  <div className="mobile-profile-info">
+                    <img 
+                      src={profile?.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200"} 
+                      alt="Profile" 
+                      className="nav-avatar" 
+                    />
+                    <span>{profile ? `${profile.first_name} ${profile.last_name}` : 'Student'}</span>
+                  </div>
+                  <button className="btn btn-secondary btn-mobile-logout" onClick={handleLogoutClick}>
+                    Sign Out
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="mobile-drawer-auth">
+                <Link to="/auth" className="btn btn-primary mobile-login-btn">
+                  Login / Register
+                </Link>
+              </div>
+            )}
+          </nav>
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <div className="content-wrapper">
         <main className="main-content">
           <Suspense fallback={
             <div className="suspense-loader">
@@ -233,11 +246,11 @@ function MainAppContent() {
           </Suspense>
         </main>
 
-        {!showSidebar && (
-          <footer className="footer">
+        <footer className="footer">
+          <div className="footer-container">
             <p>&copy; 2026 Adaptive Learning Platform. All rights reserved.</p>
-          </footer>
-        )}
+          </div>
+        </footer>
       </div>
     </div>
   )

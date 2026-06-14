@@ -25,6 +25,9 @@ function Dashboard() {
   const [timetable, setTimetable] = useState([])
   const [quickTaskTitle, setQuickTaskTitle] = useState('')
   const [subjects, setSubjects] = useState([])
+  
+  // Tab navigation state
+  const [activeTab, setActiveTab] = useState('overview')
 
   const loadDashboardData = (showLoader = false) => {
     if (showLoader) {
@@ -51,7 +54,7 @@ function Dashboard() {
         setAchievements(goalsData.achievements || [])
         setTimetable(timetableData)
         
-        // Filter bookmarked subjects from catalog
+        // Filter bookmarked subjects
         const bookmarked = subjectsData.filter(s => s.is_bookmarked)
         setBookmarkedSubjects(bookmarked)
         
@@ -65,13 +68,13 @@ function Dashboard() {
   }
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadDashboardData(false)
+    const timer = setTimeout(() => {
+      loadDashboardData(false)
+    }, 0)
+    return () => clearTimeout(timer)
   }, [])
 
-
-
-  // --- SKELETON LOADERS RENDERING (Phase 1) ---
+  // --- SKELETON LOADERS ---
   if (loading) {
     return (
       <div className="page dashboard-page">
@@ -79,16 +82,14 @@ function Dashboard() {
           <div className="skeleton-bar skeleton-title skeleton-animated"></div>
           <div className="skeleton-bar skeleton-subtitle skeleton-animated"></div>
         </div>
-
         <div className="dashboard-grid">
           {[1, 2, 3, 4].map(n => (
             <div key={n} className="stat-card skeleton-card skeleton-animated" style={{ height: '100px' }}></div>
           ))}
         </div>
-
         <div className="dashboard-charts-row">
-          <div className="chart-card glass-card skeleton-card skeleton-animated" style={{ height: '280px' }}></div>
-          <div className="chart-card glass-card skeleton-card skeleton-animated" style={{ height: '280px' }}></div>
+          <div className="chart-card skeleton-card skeleton-animated" style={{ height: '280px' }}></div>
+          <div className="chart-card skeleton-card skeleton-animated" style={{ height: '280px' }}></div>
         </div>
       </div>
     )
@@ -100,47 +101,39 @@ function Dashboard() {
         <div className="dashboard-header-container">
           <h1>Learning Dashboard</h1>
         </div>
-        <div className="quiz-container error-container glass-card">
+        <div className="error-container card">
           <p className="error-message">{error}</p>
-          <button className="btn btn-primary" onClick={loadDashboardData}>Retry</button>
+          <button className="btn btn-primary" onClick={() => loadDashboardData(true)}>Retry</button>
         </div>
       </div>
     )
   }
 
-  // --- SVG CHART GENERATORS ---
-
-  // 1. Weekly Progress (Bar Chart)
+  // --- SVG Chart Renderers ---
   const renderWeeklyBarChart = () => {
     const data = stats.weekly_progress || []
     if (data.length === 0) return <p className="text-muted">No weekly progress data available.</p>
 
-    const width = 450
-    const height = 200
-    const padding = 30
+    const width = 600
+    const height = 240
+    const padding = 40
     const chartHeight = height - padding * 2
     const chartWidth = width - padding * 2
 
-    const maxVal = Math.max(...data.map(d => d.completed), 3) // minimum scale height of 3
-    const barWidth = 32
+    const maxVal = Math.max(...data.map(d => d.completed), 3)
+    const barWidth = 40
     const spacing = (chartWidth - barWidth * data.length) / (data.length - 1)
 
     return (
-      <svg className="custom-svg-chart" viewBox={`0 0 ${width} ${height}`}>
-        {/* Grid lines */}
+      <svg className="custom-svg-chart bar-chart-canvas" viewBox={`0 0 ${width} ${height}`}>
+        {/* Horizontal grid lines */}
         {[0, 1, 2, 3].map(i => {
           const y = padding + (chartHeight / 3) * i
           const label = Math.round(maxVal - (maxVal / 3) * i)
           return (
             <g key={i}>
-              <line 
-                x1={padding} 
-                y1={y} 
-                x2={width - padding} 
-                y2={y} 
-                className="chart-grid-line"
-              />
-              <text x={padding - 10} y={y + 4} className="chart-axis-text axis-y">{label}</text>
+              <line x1={padding} y1={y} x2={width - padding} y2={y} className="chart-grid-line" />
+              <text x={padding - 12} y={y + 4} className="chart-axis-text axis-y">{label}</text>
             </g>
           )
         })}
@@ -148,7 +141,7 @@ function Dashboard() {
         {/* Vertical Bars */}
         {data.map((d, idx) => {
           const x = padding + idx * (barWidth + spacing)
-          const barHeight = d.completed > 0 ? (d.completed / maxVal) * chartHeight : 4
+          const barHeight = d.completed > 0 ? (d.completed / maxVal) * chartHeight : 6
           const y = height - padding - barHeight
           
           return (
@@ -158,171 +151,16 @@ function Dashboard() {
                 y={y}
                 width={barWidth}
                 height={barHeight}
-                rx={4}
+                rx={6}
                 className={`chart-bar-rect ${d.completed > 0 ? 'active-bar' : 'empty-bar'}`}
               />
               {d.completed > 0 && (
-                <text x={x + barWidth/2} y={y - 6} className="chart-bar-val">{d.completed}</text>
+                <text x={x + barWidth/2} y={y - 8} className="chart-bar-val">{d.completed}</text>
               )}
-              <text x={x + barWidth/2} y={height - padding + 15} className="chart-axis-text axis-x">{d.day}</text>
+              <text x={x + barWidth/2} y={height - padding + 18} className="chart-axis-text axis-x">{d.day}</text>
             </g>
           )
         })}
-      </svg>
-    )
-  }
-
-  // 2. Subject Performance (Polar / Radar Area Chart)
-  const renderSubjectRadarChart = () => {
-    const data = stats.subject_progress || []
-    if (data.length === 0) return <p className="text-muted">No subject scores recorded yet.</p>
-
-    const cx = 110
-    const cy = 110
-    const rMax = 70
-    const size = 220
-    const numPoints = data.length
-
-    // Helper to compute coordinates
-    const getCoordinates = (index, value) => {
-      const angle = (index * 2 * Math.PI) / numPoints - Math.PI / 2
-      const x = cx + rMax * (value / 100) * Math.cos(angle)
-      const y = cy + rMax * (value / 100) * Math.sin(angle)
-      return { x, y }
-    }
-
-    // Grid webs (Concentric circles/polygons)
-    const grids = [0.25, 0.5, 0.75, 1.0].map((scale, gIdx) => {
-      const points = data.map((_, idx) => {
-        const coords = getCoordinates(idx, scale * 100)
-        return `${coords.x},${coords.y}`
-      }).join(' ')
-      return <polygon key={gIdx} points={points} className="radar-grid-polygon" />
-    })
-
-    // Spokes and labels
-    const spokes = data.map((d, idx) => {
-      const outer = getCoordinates(idx, 100)
-      const labelPos = getCoordinates(idx, 120) // push labels further out
-      const align = labelPos.x < cx ? 'end' : (labelPos.x > cx ? 'start' : 'middle')
-      
-      return (
-        <g key={idx}>
-          <line x1={cx} y1={cy} x2={outer.x} y2={outer.y} className="radar-spoke" />
-          <text 
-            x={labelPos.x} 
-            y={labelPos.y + 4} 
-            textAnchor={align}
-            className="radar-label-text"
-          >
-            {d.subject.length > 12 ? `${d.subject.slice(0, 10)}...` : d.subject}
-          </text>
-        </g>
-      )
-    })
-
-    // Filled score shape
-    const scorePoints = data.map((d, idx) => {
-      // Use average score if completed > 0, else a small baseline
-      const score = d.completed > 0 ? d.avg_score : 20
-      const coords = getCoordinates(idx, score)
-      return `${coords.x},${coords.y}`
-    }).join(' ')
-
-    return (
-      <svg className="custom-svg-chart radar-chart" viewBox={`0 0 ${size} ${size}`}>
-        {grids}
-        {spokes}
-        {scorePoints && (
-          <polygon points={scorePoints} className="radar-score-polygon" />
-        )}
-        {/* Draw dots at vertices */}
-        {data.map((d, idx) => {
-          const score = d.completed > 0 ? d.avg_score : 20
-          const coords = getCoordinates(idx, score)
-          return (
-            <circle 
-              key={idx} 
-              cx={coords.x} 
-              cy={coords.y} 
-              r={4} 
-              className="radar-score-dot"
-              title={`${d.subject}: ${score}%`}
-            />
-          )
-        })}
-      </svg>
-    )
-  }
-
-  // 3. Engagement Trends (Bezier Line Graph)
-  const renderEngagementTrendsChart = () => {
-    const data = stats.performance_trends || []
-    if (data.length === 0) {
-      return (
-        <div className="empty-trends-box">
-          <p className="text-muted">Take a few quizzes to start compiling your score trends.</p>
-        </div>
-      )
-    }
-
-    const width = 450
-    const height = 200
-    const padding = 35
-    const chartHeight = height - padding * 2
-    const chartWidth = width - padding * 2
-
-    // Plot coordinates
-    const points = data.map((d, idx) => {
-      const x = padding + (chartWidth / Math.max(data.length - 1, 1)) * idx
-      const y = height - padding - (d.score / 100) * chartHeight
-      return { x, y, score: d.score, label: d.quiz_title, eng: d.engagement }
-    })
-
-    // Build SVG Path
-    let pathD = ''
-    if (points.length > 0) {
-      pathD = `M ${points[0].x} ${points[0].y} `
-      for (let i = 1; i < points.length; i++) {
-        // Linear segments (simplest for pure SVG compatibility)
-        pathD += `L ${points[i].x} ${points[i].y} `
-      }
-    }
-
-    return (
-      <svg className="custom-svg-chart line-chart" viewBox={`0 0 ${width} ${height}`}>
-        {/* Horizontal grids */}
-        {[0, 25, 50, 75, 100].map((yVal, i) => {
-          const y = height - padding - (yVal / 100) * chartHeight
-          return (
-            <g key={i}>
-              <line x1={padding} y1={y} x2={width - padding} y2={y} className="chart-grid-line" />
-              <text x={padding - 8} y={y + 4} className="chart-axis-text axis-y">{yVal}%</text>
-            </g>
-          )
-        })}
-
-        {/* Trend line */}
-        {pathD && (
-          <path d={pathD} className="trend-line-path" />
-        )}
-
-        {/* Nodes and tooltip labels */}
-        {points.map((pt, idx) => (
-          <g key={idx} className="line-node-group">
-            <circle 
-              cx={pt.x} 
-              cy={pt.y} 
-              r={5} 
-              className={`trend-node-circle ${pt.eng?.toLowerCase() || 'focused'}`}
-            />
-            {/* Draw brief index underneath */}
-            <text x={pt.x} y={height - padding + 15} className="chart-axis-text axis-x">#{idx + 1}</text>
-            
-            {/* Floating text values on top of node */}
-            <text x={pt.x} y={pt.y - 10} className="chart-node-label-val">{Math.round(pt.score)}%</text>
-          </g>
-        ))}
       </svg>
     )
   }
@@ -354,344 +192,369 @@ function Dashboard() {
     }
   }
 
+  // Count active/total quizzes and subjects
+  const subjectsCount = subjects.length
+  const quizCount = stats.lessons_completed || 0
+  const avgScore = stats.average_score || 0
+  const engagementScore = stats.engagement_score || 0
+
   return (
     <div className="page dashboard-page">
+      {/* Header Profile Title Area */}
       <div className="dashboard-header-container">
-        <h1>Welcome Back, {profile?.first_name || "Student"}!</h1>
-        <p className="dashboard-subtitle">
-          {profile?.role === 'admin' 
-            ? 'Administrator account overview panel.' 
-            : `Track your study streak, review weak areas, and unlock recommended guides.`
-          }
-        </p>
-
+        <div className="dashboard-welcome">
+          <h1>Welcome Back, {profile?.first_name || "Student"}!</h1>
+          <p className="dashboard-subtitle">
+            Track your study streaks, review weak areas, and unlock recommended subject materials.
+          </p>
+        </div>
+        
         {profile && (
           <div className="profile-quick-stats">
             <span className="profile-quick-badge">
               🎯 <strong>Goal:</strong> {profile.weekly_goal} hrs/week
             </span>
             <span className="profile-quick-badge">
-              📚 <strong>Pace:</strong> {profile.preferred_pace}
+              📚 <strong>Style:</strong> {profile.learning_style}
             </span>
             <span className="profile-quick-badge">
-              💡 <strong>Style:</strong> {profile.learning_style}
+              ⚡ <strong>Streak:</strong> {stats.streak_days} days
             </span>
-            {profile.enable_reminders && (
-              <span className="profile-quick-badge reminders-active">
-                🔔 Alerts Active
-              </span>
-            )}
           </div>
         )}
       </div>
 
-      {/* Overview stats metrics row */}
-      <div className="dashboard-grid">
-        <div className="stat-card glass-card">
-          <h3>Lessons Completed</h3>
-          <p className="stat-value">{stats.lessons_completed}</p>
-        </div>
-        <div className="stat-card glass-card">
-          <h3>Learning Streak</h3>
-          <p className="stat-value">{stats.streak_days} days</p>
-        </div>
-        <div className="stat-card glass-card">
-          <h3>Engagement Score</h3>
-          <p className="stat-value">{stats.engagement_score}%</p>
-        </div>
-        <div className="stat-card glass-card">
-          <h3>Average Quiz Score</h3>
-          <p className="stat-value">{stats.average_score}%</p>
-        </div>
+      {/* Modern Tab System to keep it clean */}
+      <div className="dashboard-tabs">
+        <button 
+          className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
+          onClick={() => setActiveTab('overview')}
+        >
+          📊 Overview
+        </button>
+        <button 
+          className={`tab-btn ${activeTab === 'tasks-goals' ? 'active' : ''}`}
+          onClick={() => setActiveTab('tasks-goals')}
+        >
+          📅 Tasks & Goals
+        </button>
+        <button 
+          className={`tab-btn ${activeTab === 'achievements' ? 'active' : ''}`}
+          onClick={() => setActiveTab('achievements')}
+        >
+          🏆 Achievements
+        </button>
       </div>
 
-      {/* Main Row: SVG Charts */}
-      <div className="dashboard-charts-row">
-        <div className="chart-card glass-card">
-          <h3>Weekly Study Progress</h3>
-          <p className="chart-subtitle-desc">Completed quizzes by calendar day (Mon-Sun)</p>
-          <div className="chart-render-box">
-            {renderWeeklyBarChart()}
-          </div>
-        </div>
-
-        <div className="chart-card glass-card">
-          <h3>Subject Mastery Breakdown</h3>
-          <p className="chart-subtitle-desc">Mastery radar scores per active learning topic</p>
-          <div className="chart-render-box radar-render">
-            {renderSubjectRadarChart()}
-          </div>
-        </div>
-      </div>
-
-      {/* Dynamic Extensions Grid: Timetable, Tasks, Goals & Achievements */}
-      <div className="dashboard-extensions-grid">
-        {/* Today's Timetable Widget */}
-        <div className="dashboard-widget-card glass-card">
-          <div className="widget-header-row">
-            <h3>Today's Study Plan 📅</h3>
-            <Link to="/timetable" className="btn btn-secondary widget-action-btn">Go to Planner</Link>
-          </div>
+      {activeTab === 'overview' && (
+        <div className="dashboard-content-flow">
           
-          <div className="today-slots-widget-list">
-            {getTodayTimetable().length > 0 ? (
-              getTodayTimetable().map(slot => (
-                <div key={slot.id} className="today-slot-row">
-                  <div className="today-slot-left">
-                    <span className="today-slot-time-text">{slot.time_slot}</span>
-                    <span className="today-slot-subject-text">
-                      {subjects.find(s => s.id === slot.subject_id)?.title || slot.subject_id.toUpperCase()}
-                    </span>
-                    <span className="today-slot-topic-text">{slot.topic}</span>
-                  </div>
-                  <span className={`slot-priority-badge priority-${slot.priority.toLowerCase()}`}>
-                    {slot.priority}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                No study sessions scheduled for today. Rest day! 🧘‍♂️
+          {/* 1. TOP STATS ROW */}
+          <div className="dashboard-grid">
+            <div className="stat-card">
+              <span className="stat-icon-label">📚</span>
+              <div className="stat-meta">
+                <h3>Subjects</h3>
+                <p className="stat-value">{subjectsCount}</p>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Task Checklist Widget */}
-        <div className="dashboard-widget-card glass-card">
-          <div className="widget-header-row">
-            <h3>Checklist Tracker 📝</h3>
-            <span className="sidebar-user-role" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
-              {tasks.filter(t => t.status === 'Completed').length}/{tasks.length} Completed
-            </span>
-          </div>
-
-          <div className="widget-items-list" style={{ maxHeight: '220px', overflowY: 'auto', marginBottom: '1rem' }}>
-            {tasks.length > 0 ? (
-              tasks.map(task => (
-                <div key={task.id} className={`task-item-row ${task.status === 'Completed' ? 'task-completed' : ''}`}>
-                  <div className="task-left-block">
-                    <input 
-                      type="checkbox" 
-                      checked={task.status === 'Completed'} 
-                      onChange={() => handleToggleTask(task.id, task.status)}
-                      className="task-checkbox-input"
-                    />
-                    <div className="task-text-info">
-                      <span className="task-title-text">{task.title}</span>
-                      {task.due_date && <span className="task-due-date-text">Due: {task.due_date}</span>}
-                    </div>
-                  </div>
-                  <span className={`slot-priority-badge priority-${task.priority?.toLowerCase() || 'medium'}`}>
-                    {task.priority || 'Medium'}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                No tasks in checklist. Add one below!
-              </div>
-            )}
-          </div>
-
-          <form onSubmit={handleQuickTaskSubmit} style={{ display: 'flex', gap: '0.5rem' }}>
-            <input 
-              type="text" 
-              placeholder="Add quick study task..." 
-              value={quickTaskTitle}
-              onChange={e => setQuickTaskTitle(e.target.value)}
-              style={{ flexGrow: 1, padding: '0.5rem 0.75rem', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: 'white', fontSize: '0.85rem' }}
-            />
-            <button type="submit" className="btn btn-secondary" style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }}>Add</button>
-          </form>
-        </div>
-
-        {/* Study Goals Widget */}
-        <div className="dashboard-widget-card glass-card">
-          <div className="widget-header-row">
-            <h3>Active Study Goals 🎯</h3>
-          </div>
-
-          <div className="widget-items-list" style={{ maxHeight: '250px', overflowY: 'auto' }}>
-            {goals.length > 0 ? (
-              goals.map(goal => {
-                const percent = Math.min(100, Math.round((goal.current_value / goal.target_value) * 100))
-                return (
-                  <div key={goal.id} className="goal-progress-card">
-                    <div className="goal-info-header">
-                      <span className="goal-title-text">{goal.title}</span>
-                      <span className="goal-progress-ratio">{percent}%</span>
-                    </div>
-                    <div className="goal-progress-bar-container">
-                      <div className="goal-progress-bar-fill" style={{ width: `${percent}%` }}></div>
-                    </div>
-                    <div className="goal-details-footer">
-                      <span>Type: {goal.goal_type}</span>
-                      {goal.deadline && <span>Target: {goal.deadline}</span>}
-                    </div>
-                  </div>
-                )
-              })
-            ) : (
-              <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                No active goals. Set goals in your profile!
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Achievements Shelf Widget */}
-        <div className="dashboard-widget-card glass-card">
-          <div className="widget-header-row">
-            <h3>Achievements & Badges 🏆</h3>
-          </div>
-
-          <div className="achievements-scrolling-container">
-            {achievements.length > 0 ? (
-              achievements.map(badge => (
-                <div key={badge.id} className="achievement-badge-card">
-                  <span className="achievement-badge-card-icon">{badge.icon}</span>
-                  <span className="achievement-badge-card-title">{badge.title}</span>
-                  <span className="achievement-badge-card-desc">{badge.description}</span>
-                </div>
-              ))
-            ) : (
-              <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)', width: '100%' }}>
-                Start completing goals and quizzes to unlock badges! 🏆
-              </div>
-            )}
-          </div>
-          
-          <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <span className="pref-label" style={{ display: 'block', fontSize: '0.75rem' }}>Weekly Learning Report</span>
-              <span style={{ fontSize: '0.9rem', color: 'white', fontWeight: 'bold' }}>Review stats & AI insights</span>
             </div>
-            <Link to="/reports" className="btn btn-ai-planner" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>View Reports ❯</Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Row split: Trends, Bookmarks, and AI Recommendation */}
-      <div className="dashboard-double-column">
-        {/* Performance trends line chart */}
-        <div className="column-card glass-card flex-2">
-          <h3>Performance & Focus Trends</h3>
-          <p className="chart-subtitle-desc">Score patterns over your last 10 quiz attempts</p>
-          <div className="chart-render-box">
-            {renderEngagementTrendsChart()}
-          </div>
-          
-          <div className="trends-legend">
-            <span className="legend-item"><span className="legend-dot focused"></span> Focused</span>
-            <span className="legend-item"><span className="legend-dot struggling"></span> Struggling</span>
-            <span className="legend-item"><span className="legend-dot bored"></span> Bored</span>
-          </div>
-        </div>
-
-        {/* AI Recommendations & Weak/Strong areas */}
-        <div className="column-card glass-card flex-1 recommendations-dashboard-card">
-          <h3>AI Path Recommendations</h3>
-          
-          {recommendations ? (
-            <div className="recommendation-content-box">
-              <div className="rec-subject-header">
-                <h4>Suggested Quiz:</h4>
-                <span className={`difficulty-badge ${recommendations.recommended_difficulty?.toLowerCase()}`}>
-                  {recommendations.recommended_difficulty}
-                </span>
+            <div className="stat-card">
+              <span className="stat-icon-label">📝</span>
+              <div className="stat-meta">
+                <h3>Quizzes Taken</h3>
+                <p className="stat-value">{quizCount}</p>
               </div>
-              
-              <h5 className="rec-quiz-title">
-                {recommendations.quiz_details?.title || 'Loading next target...'}
-              </h5>
-              <p className="rec-reason-desc">
-                {recommendations.reason}
-              </p>
+            </div>
+            <div className="stat-card">
+              <span className="stat-icon-label">📈</span>
+              <div className="stat-meta">
+                <h3>Average Score</h3>
+                <p className="stat-value">{avgScore}%</p>
+              </div>
+            </div>
+            <div className="stat-card">
+              <span className="stat-icon-label">⚡</span>
+              <div className="stat-meta">
+                <h3>Engagement</h3>
+                <p className="stat-value">{engagementScore}%</p>
+              </div>
+            </div>
+          </div>
 
-              {/* Weak / Strong Areas */}
-              <div className="areas-list-box">
-                {recommendations.weak_topics?.length > 0 && (
-                  <div className="area-group">
-                    <span className="area-title weak">⚠️ Weak Areas:</span>
-                    <div className="area-badges-row">
-                      {recommendations.weak_topics.map(t => (
-                        <span key={t} className="area-badge weak">{t}</span>
+          {/* 2. SECOND SECTION: WEEKLY PROGRESS CHART */}
+          <div className="dashboard-section-card">
+            <div className="section-card-header">
+              <h2>Weekly Progress Chart</h2>
+              <span className="section-card-desc">Completed quizzes by calendar day (Mon-Sun)</span>
+            </div>
+            <div className="chart-container-large">
+              {renderWeeklyBarChart()}
+            </div>
+          </div>
+
+          {/* 3. THIRD SECTION: RECOMMENDED SUBJECTS */}
+          <div className="dashboard-section-card">
+            <div className="section-card-header">
+              <h2>Recommended Subjects</h2>
+              <span className="section-card-desc">Based on your dynamic AI learning recommendation</span>
+            </div>
+            
+            {recommendations ? (
+              <div className="rec-dashboard-layout">
+                <div className="rec-info-banner">
+                  <div className="rec-info-badge">
+                    <span>AI Recommended Path</span>
+                    <span className={`difficulty-badge ${recommendations.recommended_difficulty?.toLowerCase()}`}>
+                      {recommendations.recommended_difficulty}
+                    </span>
+                  </div>
+                  <h3>{recommendations.quiz_details?.title || 'Launch Next Subject Path'}</h3>
+                  <p className="rec-reason">{recommendations.reason}</p>
+                  
+                  {/* Subject Badge Row */}
+                  <div className="rec-subject-chips">
+                    {recommendations.weak_topics?.length > 0 && (
+                      <div className="chip-group">
+                        <span className="chip-label text-red">Improvement Area:</span>
+                        {recommendations.weak_topics.map(t => (
+                          <span key={t} className="badge-chip badge-red">{t}</span>
+                        ))}
+                      </div>
+                    )}
+                    {recommendations.strong_topics?.length > 0 && (
+                      <div className="chip-group">
+                        <span className="chip-label text-green">Mastered:</span>
+                        {recommendations.strong_topics.map(t => (
+                          <span key={t} className="badge-chip badge-green">{t}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {recommendations.recommended_quiz_id && (
+                    <Link to="/quiz" className="btn btn-primary btn-rec-action">
+                      Start Recommended Assessment ⚡
+                    </Link>
+                  )}
+                </div>
+
+                <div className="bookmarked-catalog-section">
+                  <h4>Bookmarked Subjects</h4>
+                  {bookmarkedSubjects.length === 0 ? (
+                    <div className="empty-bookmarks">
+                      <p>No bookmarked subjects yet.</p>
+                      <Link to="/subjects" className="link-action">Browse Subjects Catalog ❯</Link>
+                    </div>
+                  ) : (
+                    <div className="bookmark-quick-grid">
+                      {bookmarkedSubjects.slice(0, 3).map(sub => (
+                        <div key={sub.id} className="bookmark-mini-card">
+                          <div className="b-meta">
+                            <span className="b-title">{sub.title}</span>
+                            <span className="b-cat">{sub.category}</span>
+                          </div>
+                          <Link to={`/quiz?subject_id=${sub.id}`} className="b-btn">Start</Link>
+                        </div>
                       ))}
                     </div>
-                  </div>
-                )}
-                
-                {recommendations.strong_topics?.length > 0 && (
-                  <div className="area-group">
-                    <span className="area-title strong">🏆 Strong Areas:</span>
-                    <div className="area-badges-row">
-                      {recommendations.strong_topics.map(t => (
-                        <span key={t} className="area-badge strong">{t}</span>
-                      ))}
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="empty-recommendations-prompt">
+                <p>Complete your onboarding quiz to trigger custom AI recommendations.</p>
+                <Link to="/quiz" className="btn btn-secondary">Go to Quizzes</Link>
+              </div>
+            )}
+          </div>
+
+          {/* 4. FOURTH SECTION: UPCOMING TIMETABLE */}
+          <div className="dashboard-section-card">
+            <div className="section-card-header flex-header">
+              <div>
+                <h2>Upcoming Timetable Plan</h2>
+                <span className="section-card-desc">Your planned study scheduler slots for today</span>
+              </div>
+              <Link to="/timetable" className="btn btn-secondary btn-sm">Manage Schedule</Link>
+            </div>
+            
+            <div className="upcoming-timetable-list">
+              {getTodayTimetable().length > 0 ? (
+                getTodayTimetable().map(slot => (
+                  <div key={slot.id} className="timetable-list-item">
+                    <div className="t-time-box">
+                      <span className="t-time">{slot.time_slot}</span>
+                      <span className={`t-priority priority-${slot.priority.toLowerCase()}`}>
+                        {slot.priority}
+                      </span>
+                    </div>
+                    <div className="t-info-box">
+                      <h4>{subjects.find(s => s.id === slot.subject_id)?.title || slot.subject_id.toUpperCase()}</h4>
+                      <p>Topic: {slot.topic}</p>
                     </div>
                   </div>
-                )}
-              </div>
-
-              {recommendations.recommended_quiz_id && (
-                <Link 
-                  to="/quiz" 
-                  className="btn btn-primary btn-block btn-start-rec-quiz"
-                >
-                  Start Recommended Path ⚡
-                </Link>
+                ))
+              ) : (
+                <div className="empty-timetable-state">
+                  <p>No study sessions scheduled for today. Take it easy or set up goals!</p>
+                  <Link to="/timetable" className="link-action">Go to Study Planner 📅</Link>
+                </div>
               )}
             </div>
-          ) : (
-            <p className="text-muted">Complete an onboarding quiz to enable AI-powered learning path suggestions.</p>
-          )}
-        </div>
-      </div>
-
-      {/* Bookmarked Subjects List */}
-      <section className="dashboard-bookmarks-section glass-card">
-        <h3>Bookmarked Courses</h3>
-        {bookmarkedSubjects.length === 0 ? (
-          <div className="no-bookmarks-prompt">
-            <p>You haven't bookmarked any subjects yet.</p>
-            <Link to="/subjects" className="btn btn-secondary">Explore Subjects Catalog ❯</Link>
           </div>
-        ) : (
-          <div className="bookmarks-row-grid">
-            {bookmarkedSubjects.map(sub => (
-              <div key={sub.id} className="bookmark-pill-card glass-card">
-                <div className="pill-header">
-                  <span className="pill-title">{sub.title}</span>
-                  <span className="pill-category">{sub.category}</span>
-                </div>
-                <div className="pill-body">
-                  <span>Quizzes: <strong>{sub.quiz_count}</strong></span>
-                  <Link to={`/quiz?subject_id=${sub.id}`} className="btn-start-pill">Launch</Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
 
-      {/* Recent Activity List */}
-      <section className="recent-activity">
-        <h2>Recent Activity History</h2>
-        <div className="activity-list">
-          {stats.recent_activity.map((activity, index) => (
-            <div key={index} className="activity-item glass-card">
-              <div className="activity-header">
-                <h4>{activity.title}</h4>
-                <span className={`activity-badge ${activity.engagement?.toLowerCase() || 'focused'}`}>
-                  {activity.engagement || 'Focused'}
-                </span>
-              </div>
-              <p>{activity.description}</p>
+          {/* 5. FIFTH SECTION: RECENT ACTIVITY */}
+          <div className="dashboard-section-card">
+            <div className="section-card-header">
+              <h2>Recent Activity</h2>
+              <span className="section-card-desc">Review your latest platform focus and quiz attempts</span>
             </div>
-          ))}
+            
+            <div className="recent-activity-list-premium">
+              {stats.recent_activity && stats.recent_activity.length > 0 ? (
+                stats.recent_activity.map((activity, index) => (
+                  <div key={index} className="activity-item-premium">
+                    <div className="act-header">
+                      <h4>{activity.title}</h4>
+                      <span className={`activity-badge ${activity.engagement?.toLowerCase() || 'focused'}`}>
+                        {activity.engagement || 'Focused'}
+                      </span>
+                    </div>
+                    <p className="act-desc">{activity.description}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-muted" style={{ padding: '1rem 0' }}>No recent learning activity.</p>
+              )}
+            </div>
+          </div>
+
         </div>
-      </section>
+      )}
+
+      {activeTab === 'tasks-goals' && (
+        <div className="dashboard-content-flow">
+          <div className="dashboard-split-row">
+            
+            {/* Checklist Tracker */}
+            <div className="dashboard-section-card flex-1">
+              <div className="section-card-header flex-header">
+                <div>
+                  <h2>Checklist Tracker</h2>
+                  <span className="section-card-desc">
+                    {tasks.filter(t => t.status === 'Completed').length}/{tasks.length} tasks completed
+                  </span>
+                </div>
+              </div>
+
+              <div className="checklist-items-scrollable">
+                {tasks.length > 0 ? (
+                  tasks.map(task => (
+                    <div key={task.id} className={`checklist-row ${task.status === 'Completed' ? 'checked' : ''}`}>
+                      <div className="check-block">
+                        <input 
+                          type="checkbox" 
+                          checked={task.status === 'Completed'} 
+                          onChange={() => handleToggleTask(task.id, task.status)}
+                          className="check-input"
+                        />
+                        <div className="check-text">
+                          <span className="check-title">{task.title}</span>
+                          {task.due_date && <span className="check-due">Due: {task.due_date}</span>}
+                        </div>
+                      </div>
+                      <span className={`priority-badge-dot priority-${task.priority?.toLowerCase() || 'medium'}`}>
+                        {task.priority || 'Medium'}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="empty-checklist-prompt">
+                    <p>No study tasks on your checklist.</p>
+                  </div>
+                )}
+              </div>
+
+              <form onSubmit={handleQuickTaskSubmit} className="quick-task-form">
+                <input 
+                  type="text" 
+                  placeholder="Create quick checklist item..." 
+                  value={quickTaskTitle}
+                  onChange={e => setQuickTaskTitle(e.target.value)}
+                  className="quick-task-input"
+                />
+                <button type="submit" className="btn btn-secondary">Add</button>
+              </form>
+            </div>
+
+            {/* Active Study Goals */}
+            <div className="dashboard-section-card flex-1">
+              <div className="section-card-header">
+                <h2>Active Study Goals</h2>
+                <span className="section-card-desc">Track progress against your defined milestones</span>
+              </div>
+
+              <div className="goals-items-scrollable">
+                {goals.length > 0 ? (
+                  goals.map(goal => {
+                    const percent = Math.min(100, Math.round((goal.current_value / goal.target_value) * 100))
+                    return (
+                      <div key={goal.id} className="goal-status-box">
+                        <div className="goal-status-header">
+                          <span className="g-title">{goal.title}</span>
+                          <span className="g-percent">{percent}%</span>
+                        </div>
+                        <div className="goal-meter-container">
+                          <div className="goal-meter-fill" style={{ width: `${percent}%` }}></div>
+                        </div>
+                        <div className="goal-status-meta">
+                          <span>Target: {goal.target_value} ({goal.goal_type})</span>
+                          {goal.deadline && <span>By: {goal.deadline}</span>}
+                        </div>
+                      </div>
+                    )
+                  })
+                ) : (
+                  <div className="empty-goals-prompt">
+                    <p>No active goals set. Define goals in your student profile page!</p>
+                    <Link to="/profile" className="btn btn-secondary btn-sm">Set Goals</Link>
+                  </div>
+                )}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'achievements' && (
+        <div className="dashboard-content-flow">
+          <div className="dashboard-section-card">
+            <div className="section-card-header">
+              <h2>Achievements & Badges</h2>
+              <span className="section-card-desc">Unlocked milestones and student recognition badges</span>
+            </div>
+
+            <div className="badges-showcase-grid">
+              {achievements.length > 0 ? (
+                achievements.map(badge => (
+                  <div key={badge.id} className="badge-item-card">
+                    <div className="badge-icon-wrap">{badge.icon}</div>
+                    <h3>{badge.title}</h3>
+                    <p>{badge.description}</p>
+                  </div>
+                ))
+              ) : (
+                <div className="empty-badges-prompt">
+                  <span className="trophy-big">🏆</span>
+                  <p>Start resolving quizzes and completing checklist targets to unlock badges!</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

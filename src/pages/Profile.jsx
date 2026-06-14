@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { fetchProfile, updateProfile, fetchDashboardStats } from '../api'
+import { fetchProfile, updateProfile, fetchDashboardStats, fetchGoals, fetchTimetable } from '../api'
 
 const CURATED_AVATARS = [
   "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150",
@@ -56,6 +56,11 @@ function Profile() {
   const [isEditing, setIsEditing] = useState(false)
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
+  
+  // New States for Profile sections
+  const [goals, setGoals] = useState([])
+  const [achievements, setAchievements] = useState([])
+  const [timetable, setTimetable] = useState([])
 
   // Edit Form Fields
   const [firstName, setFirstName] = useState('')
@@ -72,16 +77,20 @@ function Profile() {
   const [learningInterests, setLearningInterests] = useState([])
   const [learningGoals, setLearningGoals] = useState('')
 
-  useEffect(() => {
-    loadProfileAndStats()
-  }, [])
-
   const loadProfileAndStats = () => {
     setLoading(true)
-    Promise.all([fetchProfile(), fetchDashboardStats()])
-      .then(([profileData, statsData]) => {
+    Promise.all([
+      fetchProfile(), 
+      fetchDashboardStats(),
+      fetchGoals().catch(() => ({ goals: [], achievements: [] })),
+      fetchTimetable().catch(() => [])
+    ])
+      .then(([profileData, statsData, goalsData, timetableData]) => {
         setProfile(profileData)
         setStats(statsData)
+        setGoals(goalsData.goals || [])
+        setAchievements(goalsData.achievements || [])
+        setTimetable(timetableData)
 
         // Initialize form fields
         setFirstName(profileData.first_name || '')
@@ -106,6 +115,13 @@ function Profile() {
         setLoading(false)
       })
   }
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadProfileAndStats()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [])
 
   const handleInterestToggle = (interestId) => {
     if (learningInterests.includes(interestId)) {
@@ -150,8 +166,6 @@ function Profile() {
         }))
         setIsEditing(false)
         setSaving(false)
-        
-        // Notify App.jsx root that profile changed, updating navbar in real-time!
         window.dispatchEvent(new Event('profile-updated'))
       })
       .catch(err => {
@@ -175,8 +189,8 @@ function Profile() {
   return (
     <div className="page profile-page">
       <div className="dashboard-header-container">
-        <h1>Student Profile</h1>
-        <p className="dashboard-subtitle">Customize your onboarding details, learning preferences, and visual avatar.</p>
+        <h1>Student Portal Settings</h1>
+        <p className="dashboard-subtitle">Configure your study options, personalize learning tracks, and manage milestones.</p>
       </div>
 
       {error && (
@@ -186,298 +200,371 @@ function Profile() {
         </div>
       )}
 
-      <div className="profile-container">
-        {isEditing ? (
-          <form onSubmit={handleSave} className="profile-edit-form glass-card">
-            <section className="profile-edit-header-section">
-              <h3>Edit Profile Information</h3>
-              <div className="avatar-curated-selector-container">
-                <label>Select Avatar Portrait</label>
-                <div className="avatar-curated-grid">
-                  {CURATED_AVATARS.map((url, idx) => (
-                    <img
-                      key={idx}
-                      src={url}
-                      alt={`Avatar options ${idx + 1}`}
-                      className={`curated-avatar-option ${avatarUrl === url ? 'selected-avatar' : ''}`}
-                      onClick={() => setAvatarUrl(url)}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="form-row-2">
-                <div className="form-group">
-                  <label>First Name *</label>
-                  <input
-                    type="text"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    required
+      {isEditing ? (
+        <form onSubmit={handleSave} className="profile-edit-form card">
+          <section className="profile-edit-header-section">
+            <h3>Edit Profile Information</h3>
+            
+            <div className="avatar-curated-selector-container">
+              <label>Select Avatar Portrait</label>
+              <div className="avatar-curated-grid">
+                {CURATED_AVATARS.map((url, idx) => (
+                  <img
+                    key={idx}
+                    src={url}
+                    alt={`Option ${idx + 1}`}
+                    className={`curated-avatar-option ${avatarUrl === url ? 'selected-avatar' : ''}`}
+                    onClick={() => setAvatarUrl(url)}
                   />
-                </div>
-                <div className="form-group">
-                  <label>Last Name *</label>
-                  <input
-                    type="text"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    required
-                  />
-                </div>
+                ))}
               </div>
-
-              <div className="form-row-2">
-                <div className="form-group">
-                  <label>Email Address *</label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Education Level *</label>
-                  <select
-                    value={educationLevel}
-                    onChange={(e) => setEducationLevel(e.target.value)}
-                  >
-                    <option value="School">Secondary School</option>
-                    <option value="High School">High School</option>
-                    <option value="Undergraduate">Undergraduate Degree</option>
-                    <option value="Graduate">Postgraduate Degree</option>
-                    <option value="Professional">Professional Practitioner</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Learning Goals & Statement</label>
-                <textarea
-                  value={learningGoals}
-                  onChange={(e) => setLearningGoals(e.target.value)}
-                  rows="2"
-                  placeholder="e.g. Master algorithms, improve calculus, prepare for jobs..."
-                ></textarea>
-              </div>
-
-              <div className="form-group">
-                <label>Update Learning Interests * (Pick at least 1)</label>
-                <div className="interests-grid-scroll">
-                  {ALL_INTERESTS.map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      className={`interest-tag-btn ${learningInterests.includes(opt.id) ? 'active' : ''}`}
-                      onClick={() => handleInterestToggle(opt.id)}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </section>
-
-            <section className="engagement-metrics-edit">
-              <h3>Preferences & Goals</h3>
-              
-              <div className="form-row-3">
-                <div className="form-group">
-                  <label>Learning Style</label>
-                  <select value={learningStyle} onChange={(e) => setLearningStyle(e.target.value)}>
-                    <option value="Visual Learner">Visual Learner</option>
-                    <option value="Auditory Learner">Auditory Learner</option>
-                    <option value="Read/Write Learner">Read/Write Learner</option>
-                    <option value="Kinesthetic Learner">Kinesthetic Learner</option>
-                    <option value="Structured Learner">Structured Learner</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Preferred Pace</label>
-                  <select value={preferredPace} onChange={(e) => setPreferredPace(e.target.value)}>
-                    <option value="Self-paced">Self-paced (Slow)</option>
-                    <option value="Moderate pace">Moderate pace</option>
-                    <option value="Fast pace">Fast pace</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Peak Time</label>
-                  <input
-                    type="text"
-                    value={peakTime}
-                    onChange={(e) => setPeakTime(e.target.value)}
-                    placeholder="e.g. Evenings (6 PM - 9 PM)"
-                  />
-                </div>
-              </div>
-
-              <div className="form-row-2">
-                <div className="form-group">
-                  <label>Weekly Goal (Study hours target)</label>
-                  <input
-                    type="number"
-                    value={weeklyGoal}
-                    onChange={(e) => setWeeklyGoal(e.target.value)}
-                    min="1"
-                    max="100"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Primary Focus Subject</label>
-                  <input
-                    type="text"
-                    value={subjectFocus}
-                    onChange={(e) => setSubjectFocus(e.target.value)}
-                    placeholder="e.g. Fullstack Development"
-                  />
-                </div>
-              </div>
-
-              <div className="form-group toggle-reminder-container">
-                <label className="switch-label">
-                  <input
-                    type="checkbox"
-                    checked={enableReminders}
-                    onChange={(e) => setEnableReminders(e.target.checked)}
-                  />
-                  <span className="switch-text">Enable real-time focus notifications during quizzes</span>
-                </label>
-              </div>
-            </section>
-
-            <div className="profile-actions-row">
-              <button type="submit" className="btn btn-primary" disabled={saving}>
-                {saving ? 'Saving changes...' : 'Save Profile Changes'}
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => {
-                  setIsEditing(false)
-                  setError(null)
-                  loadProfileAndStats()
-                }}
-                disabled={saving}
-              >
-                Cancel
-              </button>
             </div>
-          </form>
-        ) : (
-          <div className="profile-display-layout">
-            {/* Header section card */}
-            <div className="profile-display-card glass-card">
-              <div className="profile-header-display-box">
+
+            <div className="form-row-2">
+              <div className="form-group">
+                <label>First Name *</label>
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Last Name *</label>
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="form-row-2">
+              <div className="form-group">
+                <label>Email Address *</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Education Level *</label>
+                <select
+                  value={educationLevel}
+                  onChange={(e) => setEducationLevel(e.target.value)}
+                >
+                  <option value="School">Secondary School</option>
+                  <option value="High School">High School</option>
+                  <option value="Undergraduate">Undergraduate Degree</option>
+                  <option value="Graduate">Postgraduate Degree</option>
+                  <option value="Professional">Professional Practitioner</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Learning Goals & Statement</label>
+              <textarea
+                value={learningGoals}
+                onChange={(e) => setLearningGoals(e.target.value)}
+                rows="2"
+                placeholder="e.g. Master algorithms, improve calculus, prepare for jobs..."
+              ></textarea>
+            </div>
+
+            <div className="form-group">
+              <label>Update Learning Interests * (Pick at least 1)</label>
+              <div className="interests-grid-scroll">
+                {ALL_INTERESTS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    className={`interest-tag-btn ${learningInterests.includes(opt.id) ? 'active' : ''}`}
+                    onClick={() => handleInterestToggle(opt.id)}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="engagement-metrics-edit">
+            <h3>Preferences & Goals Setup</h3>
+            
+            <div className="form-row-3">
+              <div className="form-group">
+                <label>Learning Style</label>
+                <select value={learningStyle} onChange={(e) => setLearningStyle(e.target.value)}>
+                  <option value="Visual Learner">Visual Learner</option>
+                  <option value="Auditory Learner">Auditory Learner</option>
+                  <option value="Read/Write Learner">Read/Write Learner</option>
+                  <option value="Kinesthetic Learner">Kinesthetic Learner</option>
+                  <option value="Structured Learner">Structured Learner</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Preferred Pace</label>
+                <select value={preferredPace} onChange={(e) => setPreferredPace(e.target.value)}>
+                  <option value="Self-paced">Self-paced (Slow)</option>
+                  <option value="Moderate pace">Moderate pace</option>
+                  <option value="Fast pace">Fast pace</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Peak Time</label>
+                <input
+                  type="text"
+                  value={peakTime}
+                  onChange={(e) => setPeakTime(e.target.value)}
+                  placeholder="e.g. Evenings (6 PM - 9 PM)"
+                />
+              </div>
+            </div>
+
+            <div className="form-row-2">
+              <div className="form-group">
+                <label>Weekly Goal (Study hours target)</label>
+                <input
+                  type="number"
+                  value={weeklyGoal}
+                  onChange={(e) => setWeeklyGoal(e.target.value)}
+                  min="1"
+                  max="100"
+                />
+              </div>
+              <div className="form-group">
+                <label>Primary Focus Subject</label>
+                <input
+                  type="text"
+                  value={subjectFocus}
+                  onChange={(e) => setSubjectFocus(e.target.value)}
+                  placeholder="e.g. Fullstack Development"
+                />
+              </div>
+            </div>
+
+            <div className="form-group toggle-reminder-container">
+              <label className="switch-label">
+                <input
+                  type="checkbox"
+                  checked={enableReminders}
+                  onChange={(e) => setEnableReminders(e.target.checked)}
+                />
+                <span className="switch-text">Enable real-time focus notifications during quizzes</span>
+              </label>
+            </div>
+          </section>
+
+          <div className="profile-actions-row">
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? 'Saving changes...' : 'Save Profile Changes'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setIsEditing(false)
+                setError(null)
+                loadProfileAndStats()
+              }}
+              disabled={saving}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="profile-dashboard-layout">
+          
+          {/* Section 1: PROFILE CARD */}
+          <div className="profile-main-grid">
+            <div className="profile-display-card card">
+              <div className="profile-user-summary">
                 <img 
                   src={profile.avatar_url || CURATED_AVATARS[0]} 
-                  alt="Student Profile Avatar" 
+                  alt="Student Avatar" 
                   className="profile-display-avatar"
                 />
-                <div className="profile-display-name-box">
+                <div className="profile-meta-info">
                   <h2>{profile.first_name} {profile.last_name}</h2>
-                  <span className={`user-role-badge ${profile.role}`}>{profile.role === 'admin' ? '⚙️ Administrator' : '🎓 Student'}</span>
-                  <p className="profile-display-email">{profile.email}</p>
-                  <p className="profile-display-joined">Joined: {profile.joined_date || 'January 2026'}</p>
+                  <span className={`user-role-badge ${profile.role}`}>
+                    {profile.role === 'admin' ? '⚙️ Administrator' : '🎓 Student'}
+                  </span>
+                  <p className="profile-email-text">{profile.email}</p>
+                  <p className="profile-joined-text">Joined: {profile.joined_date || 'January 2026'}</p>
                 </div>
               </div>
               
-              <div className="profile-display-onboarding-info">
-                <div className="onboard-info-block">
-                  <h4>Education Level</h4>
-                  <p>{profile.education_level}</p>
+              <div className="profile-customizations-list">
+                <div className="custom-item">
+                  <span className="c-label">Education Level</span>
+                  <p className="c-val">{profile.education_level}</p>
+                </div>
+                <div className="custom-item">
+                  <span className="c-label">Subject Focus</span>
+                  <p className="c-val">{profile.subject_focus || 'Computer Science'}</p>
                 </div>
                 {profile.learning_goals && (
-                  <div className="onboard-info-block">
-                    <h4>Learning Goals</h4>
-                    <p className="goals-text-box">"{profile.learning_goals}"</p>
+                  <div className="custom-item">
+                    <span className="c-label">Goals Statement</span>
+                    <p className="c-val italic">"{profile.learning_goals}"</p>
                   </div>
                 )}
-                <div className="onboard-info-block">
-                  <h4>Interests Catalog</h4>
-                  <div className="interests-display-row">
+                <div className="custom-item">
+                  <span className="c-label">Learning Interests</span>
+                  <div className="interest-pills-row">
                     {profile.learning_interests && profile.learning_interests.length > 0 ? (
                       profile.learning_interests.map(id => {
                         const opt = ALL_INTERESTS.find(o => o.id === id)
                         return (
-                          <span key={id} className="interest-display-badge">
+                          <span key={id} className="badge-chip">
                             {opt ? opt.label : id}
                           </span>
                         )
                       })
                     ) : (
-                      <span className="text-muted">No selected interests</span>
+                      <span className="text-muted text-sm">No interests selected.</span>
                     )}
                   </div>
                 </div>
               </div>
 
-              <div className="profile-edit-btn-container">
-                <button className="btn btn-primary" onClick={() => setIsEditing(true)}>
+              <div className="profile-card-action">
+                <button className="btn btn-primary btn-block" onClick={() => setIsEditing(true)}>
                   Edit Profile Configurations
                 </button>
               </div>
             </div>
 
-            {/* Quick stats and details cards */}
-            <div className="profile-details-column">
+            {/* Section 3: LEARNING STATS */}
+            <div className="profile-sidebar-group">
               {stats && (
-                <div className="learning-stats-card glass-card">
+                <div className="learning-stats-card card">
                   <h3>Cumulative Learning Stats</h3>
-                  <div className="stats-grid">
-                    <div className="stat-card shadow-none">
-                      <h4>Streaks</h4>
-                      <p className="stat-value">{stats.streak_days} days</p>
+                  <div className="profile-stats-grid">
+                    <div className="profile-stat-box">
+                      <span className="p-stat-icon">🔥</span>
+                      <div className="p-stat-data">
+                        <h4>Streak Days</h4>
+                        <p>{stats.streak_days} days</p>
+                      </div>
                     </div>
-                    <div className="stat-card shadow-none">
-                      <h4>Completed Quizzes</h4>
-                      <p className="stat-value">{stats.lessons_completed}</p>
+                    <div className="profile-stat-box">
+                      <span className="p-stat-icon">📝</span>
+                      <div className="p-stat-data">
+                        <h4>Quizzes Met</h4>
+                        <p>{stats.lessons_completed}</p>
+                      </div>
                     </div>
-                    <div className="stat-card shadow-none">
-                      <h4>Avg Score</h4>
-                      <p className="stat-value">{stats.average_score}%</p>
+                    <div className="profile-stat-box">
+                      <span className="p-stat-icon">🎯</span>
+                      <div className="p-stat-data">
+                        <h4>Average Score</h4>
+                        <p>{stats.average_score}%</p>
+                      </div>
                     </div>
-                    <div className="stat-card shadow-none">
-                      <h4>Engagement Focus</h4>
-                      <p className="stat-value">{stats.engagement_score}%</p>
+                    <div className="profile-stat-box">
+                      <span className="p-stat-icon">⚡</span>
+                      <div className="p-stat-data">
+                        <h4>Focus Rating</h4>
+                        <p>{stats.engagement_score}%</p>
+                      </div>
                     </div>
                   </div>
                 </div>
               )}
 
-              <div className="preferences-display-card glass-card">
-                <h3>Preferences Setup</h3>
-                <div className="preferences-display-grid">
-                  <div className="preference-item">
-                    <span className="pref-label">Learning Style:</span>
-                    <strong className="pref-value">{profile.learning_style}</strong>
-                  </div>
-                  <div className="preference-item">
-                    <span className="pref-label">Preferred Pace:</span>
-                    <strong className="pref-value">{profile.preferred_pace}</strong>
-                  </div>
-                  <div className="preference-item">
-                    <span className="pref-label">Peak Performance Time:</span>
-                    <strong className="pref-value">{profile.peak_time}</strong>
-                  </div>
-                  <div className="preference-item">
-                    <span className="pref-label">Weekly Goal:</span>
-                    <strong className="pref-value">{profile.weekly_goal} hours</strong>
-                  </div>
-                  <div className="preference-item">
-                    <span className="pref-label">Subject Focus:</span>
-                    <strong className="pref-value">{profile.subject_focus}</strong>
-                  </div>
-                  <div className="preference-item">
-                    <span className="pref-label">Quiz Reminder Alerts:</span>
-                    <strong className="pref-value">{profile.enable_reminders ? '🔔 Enabled' : '🔕 Muted'}</strong>
-                  </div>
+              {/* Section 4: WEEKLY REPORT */}
+              <div className="profile-report-preview-card card">
+                <h3>Weekly Performance Report</h3>
+                <p>AI compiles report cards automatically every week. Review your latest insights and printable dashboards.</p>
+                <div className="preview-action-row">
+                  <a href="/reports" className="btn btn-secondary btn-block">
+                    View Weekly Analytics 📈
+                  </a>
                 </div>
               </div>
             </div>
           </div>
-        )}
-      </div>
+
+          <div className="profile-lower-grid">
+            {/* Section 2: ACHIEVEMENTS */}
+            <div className="profile-achievements-card card">
+              <h3>Achievements & Badges</h3>
+              <div className="profile-badges-row">
+                {achievements.length > 0 ? (
+                  achievements.map(badge => (
+                    <div key={badge.id} className="badge-profile-item">
+                      <span className="badge-icon">{badge.icon}</span>
+                      <div className="badge-desc">
+                        <h4>{badge.title}</h4>
+                        <p>{badge.description}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-muted text-sm">Start resolving quizzes and matching study goals to unlock badges!</p>
+                )}
+              </div>
+            </div>
+
+            {/* Section 5: GOALS */}
+            <div className="profile-goals-card card">
+              <h3>Goals & Milestones</h3>
+              <div className="profile-goals-list">
+                {goals.length > 0 ? (
+                  goals.map(goal => {
+                    const percent = Math.min(100, Math.round((goal.current_value / goal.target_value) * 100))
+                    return (
+                      <div key={goal.id} className="profile-goal-row">
+                        <div className="goal-meta-header">
+                          <span className="g-title">{goal.title}</span>
+                          <span className="g-percent">{percent}%</span>
+                        </div>
+                        <div className="g-meter">
+                          <div className="g-meter-fill" style={{ width: `${percent}%` }}></div>
+                        </div>
+                        <p className="g-deadline">Target: {goal.target_value} completed items by {goal.deadline || 'No deadline'}</p>
+                      </div>
+                    )
+                  })
+                ) : (
+                  <p className="text-muted text-sm">No active goals found. Update goals using the profile edit panel!</p>
+                )}
+              </div>
+            </div>
+
+            {/* Section 6: TIMETABLE SUMMARY */}
+            <div className="profile-timetable-summary-card card">
+              <h3>Timetable & Planner Summary</h3>
+              <div className="profile-timetable-slots">
+                {timetable.length > 0 ? (
+                  timetable.slice(0, 4).map(slot => (
+                    <div key={slot.id} className="profile-slot-summary-row">
+                      <div className="slot-left">
+                        <span className="slot-date-badge">{slot.date}</span>
+                        <strong className="slot-subject">{slot.time_slot} - {slot.topic}</strong>
+                      </div>
+                      <span className={`priority-badge priority-${slot.priority.toLowerCase()}`}>{slot.priority}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-muted text-sm">No scheduled events in your study timetable. Create slots in study planner!</p>
+                )}
+              </div>
+              <div className="timetable-action-footer">
+                <a href="/timetable" className="link-action">Go to Planner Dashboard 📅</a>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      )}
     </div>
   )
 }

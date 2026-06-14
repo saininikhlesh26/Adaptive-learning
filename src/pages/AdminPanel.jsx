@@ -28,10 +28,6 @@ function AdminPanel() {
   ])
   const [quizSuccess, setQuizSuccess] = useState(false)
 
-  useEffect(() => {
-    loadAdminData()
-  }, [])
-
   const loadAdminData = () => {
     setLoading(true)
     Promise.all([fetchAdminMetrics(), fetchSubjects()])
@@ -49,6 +45,13 @@ function AdminPanel() {
         setLoading(false)
       })
   }
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadAdminData()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [])
 
   // Quiz questions dynamic adding/updating helpers
   const handleQuestionChange = (index, field, value) => {
@@ -113,7 +116,7 @@ function AdminPanel() {
     try {
       // Format questions' correct answers based on type
       const formattedQuestions = questions.map(q => {
-        let correctValue = q.correct
+        let correctValue;
         
         if (q.type === 'True/False') {
           // ensure it's 0 (True) or 1 (False)

@@ -4,12 +4,18 @@ import {
   fetchSubjects, 
   createTimetableItem, 
   deleteTimetableItem, 
-  generateAiTimetable 
+  generateAiTimetable,
+  fetchGoals,
+  fetchTasks,
+  updateTask,
+  createTask
 } from '../api'
 
 export default function Timetable() {
   const [schedules, setSchedules] = useState([])
   const [subjects, setSubjects] = useState([])
+  const [tasks, setTasks] = useState([])
+  const [goals, setGoals] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAiModal, setShowAiModal] = useState(false)
   const [showManualModal, setShowManualModal] = useState(false)
@@ -26,17 +32,25 @@ export default function Timetable() {
   const [priority, setPriority] = useState('Medium')
   const [submitting, setSubmitting] = useState(false)
 
+  // New task form state
+  const [quickTaskTitle, setQuickTaskTitle] = useState('')
+
   const loadData = async (showLoader = false) => {
     try {
       if (showLoader) {
         setLoading(true)
       }
-      const [schedData, subjData] = await Promise.all([
+      const [schedData, subjData, tasksData, goalsData] = await Promise.all([
         fetchTimetable(),
-        fetchSubjects()
+        fetchSubjects(),
+        fetchTasks().catch(() => []),
+        fetchGoals().catch(() => ({ goals: [] }))
       ])
       setSchedules(schedData)
       setSubjects(subjData)
+      setTasks(tasksData)
+      setGoals(goalsData.goals || [])
+      
       if (subjData.length > 0) {
         setSubjectId(subjData[0].id)
       }
@@ -48,10 +62,11 @@ export default function Timetable() {
   }
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadData(false)
+    const timer = setTimeout(() => {
+      loadData(false)
+    }, 0)
+    return () => clearTimeout(timer)
   }, [])
-
 
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to remove this study slot?')) {
@@ -103,7 +118,6 @@ export default function Timetable() {
       setGenerating(true)
       const response = await generateAiTimetable(availableHours)
       if (response.status === 'success') {
-        // Reload timetable schedules
         const updatedSched = await fetchTimetable()
         setSchedules(updatedSched)
         setShowAiModal(false)
@@ -113,6 +127,28 @@ export default function Timetable() {
       alert('AI scheduler failed: ' + err.message)
     } finally {
       setGenerating(false)
+    }
+  }
+
+  const handleToggleTask = async (taskId, currentStatus) => {
+    const newStatus = currentStatus === 'Completed' ? 'Pending' : 'Completed'
+    try {
+      await updateTask(taskId, { status: newStatus })
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t))
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const handleQuickTaskSubmit = async (e) => {
+    e.preventDefault()
+    if (!quickTaskTitle.trim()) return
+    try {
+      const newTask = await createTask({ title: quickTaskTitle.trim(), priority: 'Medium' })
+      setTasks(prev => [...prev, newTask])
+      setQuickTaskTitle('')
+    } catch (err) {
+      console.error(err)
     }
   }
 
@@ -133,6 +169,7 @@ export default function Timetable() {
   }
 
   const weekDays = getNext7Days()
+  const todayStr = new Date().toISOString().split('T')[0]
 
   // Filter slots for a specific date
   const getSlotsForDate = (dateStr) => {
@@ -153,14 +190,16 @@ export default function Timetable() {
     )
   }
 
+  const todaySlots = getSlotsForDate(todayStr)
+
   return (
     <div className="planner-page-container">
-      {/* 1. Header controls */}
-      <div className="planner-controls-card glass-card">
+      {/* Page Header controls */}
+      <div className="planner-controls-card card">
         <div className="planner-title-section">
-          <h1>Dynamic Study Planner</h1>
-          <p className="sidebar-user-role" style={{ fontSize: '0.9rem', background: 'none', padding: 0 }}>
-            Allocate available hours and let the AI balance your study schedule
+          <h1>Calendar Timetable & Planner</h1>
+          <p className="section-subtitle-description">
+            Build schedules manually or trigger the AI generator to balance workloads based on subject gaps.
           </p>
         </div>
         
@@ -168,86 +207,205 @@ export default function Timetable() {
           <button className="btn btn-secondary" onClick={() => setShowManualModal(true)}>
             ➕ Add Slot
           </button>
-          <button className="btn btn-ai-planner" onClick={() => setShowAiModal(true)}>
+          <button className="btn btn-primary" onClick={() => setShowAiModal(true)}>
             ⚡ Generate AI Timetable
           </button>
         </div>
       </div>
 
-      {/* 2. Timetable Grid */}
-      <div className="timetable-week-grid">
-        {weekDays.map(day => {
-          const daySlots = getSlotsForDate(day.dateStr)
-          return (
-            <div key={day.dateStr} className="timetable-day-column">
-              <div className="day-column-header">
-                <span className="day-name">{day.name}</span>
-                <span className="day-date">{day.displayDate}</span>
-              </div>
-              
-              {daySlots.length > 0 ? (
-                daySlots.map(slot => (
-                  <div key={slot.id} className="study-slot-card">
-                    <div className="study-slot-time">{slot.time_slot}</div>
-                    <div className="study-slot-subject">
-                      {subjects.find(s => s.id === slot.subject_id)?.title || slot.subject_id.toUpperCase()}
-                    </div>
-                    <div className="study-slot-topic" title={slot.topic}>{slot.topic}</div>
-                    
-                    <div className="study-slot-footer">
-                      <span className={`slot-priority-badge priority-${slot.priority.toLowerCase()}`}>
+      {/* Main Grid: Split into Left (Schedule) and Right (Tasks/Goals) */}
+      <div className="planner-grid-layout">
+        
+        {/* LEFT COLUMN: Today's Plan & Weekly Schedule */}
+        <div className="planner-left-column">
+          
+          {/* Section 1: Today's Plan */}
+          <div className="planner-section-card card">
+            <div className="section-card-header">
+              <h2>Today's Plan</h2>
+              <span className="section-card-desc">Scheduled revisions for today: {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+            </div>
+
+            <div className="today-slots-list">
+              {todaySlots.length > 0 ? (
+                todaySlots.map(slot => (
+                  <div key={slot.id} className="today-slot-item-card">
+                    <div className="slot-meta-top">
+                      <span className="slot-time">⏱️ {slot.time_slot}</span>
+                      <span className={`priority-badge priority-${slot.priority.toLowerCase()}`}>
                         {slot.priority}
                       </span>
-                      {slot.is_ai_generated && (
-                        <span className="slot-ai-indicator" title="AI optimized study plan based on engagement stats">
-                          AI
-                        </span>
-                      )}
-                      <button className="btn-delete-slot" onClick={() => handleDelete(slot.id)} title="Delete slot">
-                        🗑️
-                      </button>
                     </div>
+                    <h4>{subjects.find(s => s.id === slot.subject_id)?.title || slot.subject_id.toUpperCase()}</h4>
+                    <p>Topic: {slot.topic}</p>
+                    {slot.is_ai_generated && <span className="ai-tag">AI Generated</span>}
                   </div>
                 ))
               ) : (
-                <div style={{ padding: '2rem 1rem', border: '1px dashed rgba(255,255,255,0.05)', borderRadius: '10px', fontSize: '0.8rem', color: 'rgba(255,255,255,0.2)', textAlign: 'center' }}>
-                  No slots scheduled
+                <div className="empty-slot-placeholder">
+                  <p>No study slots scheduled for today. Take it easy or generate a weekly schedule!</p>
                 </div>
               )}
             </div>
-          )
-        })}
+          </div>
+
+          {/* Section 2: Weekly Schedule (Calendar columns) */}
+          <div className="planner-section-card card">
+            <div className="section-card-header">
+              <h2>Weekly Schedule</h2>
+              <span className="section-card-desc">Your revision plan for the next 7 days</span>
+            </div>
+
+            <div className="timetable-week-grid-premium">
+              {weekDays.map(day => {
+                const daySlots = getSlotsForDate(day.dateStr)
+                return (
+                  <div key={day.dateStr} className="timetable-day-column-premium">
+                    <div className="day-column-header-premium">
+                      <span className="day-name">{day.name}</span>
+                      <span className="day-date">{day.displayDate}</span>
+                    </div>
+                    
+                    <div className="day-slots-container">
+                      {daySlots.length > 0 ? (
+                        daySlots.map(slot => (
+                          <div key={slot.id} className="study-slot-card-premium">
+                            <span className="slot-time-text">{slot.time_slot}</span>
+                            <h5 className="slot-subject-text">
+                              {subjects.find(s => s.id === slot.subject_id)?.title || slot.subject_id.toUpperCase()}
+                            </h5>
+                            <p className="slot-topic-text" title={slot.topic}>{slot.topic}</p>
+                            
+                            <div className="slot-actions-row">
+                              <span className={`priority-badge priority-${slot.priority.toLowerCase()}`}>
+                                {slot.priority.charAt(0)}
+                              </span>
+                              {slot.is_ai_generated && <span className="ai-dot" title="AI optimized">🤖</span>}
+                              <button className="btn-delete-slot-premium" onClick={() => handleDelete(slot.id)}>✕</button>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="empty-day-slot">Free</div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+        </div>
+
+        {/* RIGHT COLUMN: Study Goals & Task List */}
+        <div className="planner-right-column">
+          
+          {/* Section 3: Study Goals */}
+          <div className="planner-section-card card">
+            <div className="section-card-header">
+              <h2>Study Goals</h2>
+              <span className="section-card-desc">Active target metrics for your dashboard</span>
+            </div>
+
+            <div className="goals-items-list-premium">
+              {goals.length > 0 ? (
+                goals.map(goal => {
+                  const percent = Math.min(100, Math.round((goal.current_value / goal.target_value) * 100))
+                  return (
+                    <div key={goal.id} className="goal-meter-card-premium">
+                      <div className="g-header">
+                        <span className="g-title">{goal.title}</span>
+                        <span className="g-percent">{percent}%</span>
+                      </div>
+                      <div className="g-track">
+                        <div className="g-fill" style={{ width: `${percent}%` }}></div>
+                      </div>
+                      <span className="g-deadline">Deadline: {goal.deadline || 'No target date'}</span>
+                    </div>
+                  )
+                })
+              ) : (
+                <p className="text-muted text-sm" style={{ padding: '1rem 0' }}>No active goals. Set goals in profile.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Section 4: Task List */}
+          <div className="planner-section-card card">
+            <div className="section-card-header">
+              <h2>Task List Checklist</h2>
+              <span className="section-card-desc">Simple todo checklist for placement and revisions</span>
+            </div>
+
+            <div className="checklist-items-scrollable">
+              {tasks.length > 0 ? (
+                tasks.map(task => (
+                  <div key={task.id} className={`checklist-row ${task.status === 'Completed' ? 'checked' : ''}`}>
+                    <div className="check-block">
+                      <input 
+                        type="checkbox" 
+                        checked={task.status === 'Completed'} 
+                        onChange={() => handleToggleTask(task.id, task.status)}
+                        className="check-input"
+                      />
+                      <div className="check-text">
+                        <span className="check-title">{task.title}</span>
+                        {task.due_date && <span className="check-due">Due: {task.due_date}</span>}
+                      </div>
+                    </div>
+                    <span className={`priority-badge priority-${task.priority?.toLowerCase() || 'medium'}`}>
+                      {task.priority || 'Medium'}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-muted text-sm" style={{ padding: '1rem 0' }}>No checklist items. Create one below.</p>
+              )}
+            </div>
+
+            <form onSubmit={handleQuickTaskSubmit} className="quick-task-form">
+              <input 
+                type="text" 
+                placeholder="Create new checklist item..." 
+                value={quickTaskTitle}
+                onChange={e => setQuickTaskTitle(e.target.value)}
+                className="quick-task-input"
+              />
+              <button type="submit" className="btn btn-secondary">Add</button>
+            </form>
+          </div>
+
+        </div>
+
       </div>
 
-      {/* 3. AI Scheduler Modal */}
+      {/* AI Scheduler Modal */}
       {showAiModal && (
         <div className="ai-planner-dialog-overlay" onClick={() => setShowAiModal(false)}>
-          <div className="ai-planner-dialog-card glass-card" onClick={e => e.stopPropagation()}>
-            <h2 style={{ marginBottom: '0.5rem', color: 'white' }}>⚡ AI Timetable Generator</h2>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.5rem', lineHeight: '1.4' }}>
+          <div className="ai-planner-dialog-card card" onClick={e => e.stopPropagation()}>
+            <h2>⚡ AI Timetable Generator</h2>
+            <p className="modal-desc">
               Specify the number of hours you have available for study this week. The recommendation engine allocates larger study blocks to weak/struggling subjects and leaves space for active competition revisions.
             </p>
             
             <form onSubmit={handleAiGenerate}>
-              <div style={{ marginBottom: '1.25rem' }}>
-                <label style={{ fontSize: '0.9rem', color: 'white', display: 'block', marginBottom: '0.5rem' }}>
-                  Available Study Hours (Weekly)
-                </label>
+              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                <label>Available Study Hours (Weekly)</label>
                 <input 
                   type="number" 
                   value={availableHours} 
                   onChange={e => setAvailableHours(parseInt(e.target.value) || 0)}
                   min="1" 
                   max="60"
-                  style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white', padding: '0.75rem', width: '100%' }}
+                  required
                 />
               </div>
               
-              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <div className="modal-actions-row">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowAiModal(false)}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-ai-planner" disabled={generating}>
+                <button type="submit" className="btn btn-primary" disabled={generating}>
                   {generating ? 'Optimizing Schedule...' : 'Build AI Schedule'}
                 </button>
               </div>
@@ -256,89 +414,76 @@ export default function Timetable() {
         </div>
       )}
 
-      {/* 4. Manual Slot Modal */}
+      {/* Manual Slot Modal */}
       {showManualModal && (
         <div className="ai-planner-dialog-overlay" onClick={() => setShowManualModal(false)}>
-          <div className="ai-planner-dialog-card glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
-            <h2 style={{ marginBottom: '1rem', color: 'white' }}>➕ Add Study Schedule Slot</h2>
+          <div className="ai-planner-dialog-card card" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <h2>➕ Add Study Schedule Slot</h2>
             
             <form onSubmit={handleManualSubmit} className="profile-edit-form">
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.4rem' }}>
-                  Subject
-                </label>
+              <div className="form-group">
+                <label>Subject</label>
                 <select 
                   value={subjectId} 
                   onChange={e => setSubjectId(e.target.value)}
-                  style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}
                 >
                   {subjects.map(s => (
-                    <option key={s.id} value={s.id} style={{ background: '#1c1917' }}>{s.title}</option>
+                    <option key={s.id} value={s.id}>{s.title}</option>
                   ))}
                 </select>
               </div>
 
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.4rem' }}>
-                  Topic Description
-                </label>
+              <div className="form-group">
+                <label>Topic Description</label>
                 <input 
                   type="text" 
                   value={topic} 
                   onChange={e => setTopic(e.target.value)} 
                   placeholder="e.g. Linked Lists, Integration by parts"
-                  style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}
+                  required
                 />
               </div>
 
-              <div className="form-row-2" style={{ marginBottom: '1rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.4rem' }}>
-                    Date
-                  </label>
+              <div className="form-row-2">
+                <div className="form-group">
+                  <label>Date</label>
                   <input 
                     type="date" 
                     value={date} 
                     onChange={e => setDate(e.target.value)}
-                    style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}
+                    required
                   />
                 </div>
-                <div>
-                  <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.4rem' }}>
-                    Time Slot
-                  </label>
+                <div className="form-group">
+                  <label>Time Slot</label>
                   <select 
                     value={timeSlot} 
                     onChange={e => setTimeSlot(e.target.value)}
-                    style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}
                   >
-                    <option style={{ background: '#1c1917' }} value="08:00 - 09:30">08:00 - 09:30</option>
-                    <option style={{ background: '#1c1917' }} value="10:00 - 11:30">10:00 - 11:30</option>
-                    <option style={{ background: '#1c1917' }} value="12:00 - 13:30">12:00 - 13:30</option>
-                    <option style={{ background: '#1c1917' }} value="14:00 - 15:30">14:00 - 15:30</option>
-                    <option style={{ background: '#1c1917' }} value="16:00 - 17:30">16:00 - 17:30</option>
-                    <option style={{ background: '#1c1917' }} value="18:00 - 19:30">18:00 - 19:30</option>
-                    <option style={{ background: '#1c1917' }} value="20:00 - 21:30">20:00 - 21:30</option>
+                    <option value="08:00 - 09:30">08:00 - 09:30</option>
+                    <option value="10:00 - 11:30">10:00 - 11:30</option>
+                    <option value="12:00 - 13:30">12:00 - 13:30</option>
+                    <option value="14:00 - 15:30">14:00 - 15:30</option>
+                    <option value="16:00 - 17:30">16:00 - 17:30</option>
+                    <option value="18:00 - 19:30">18:00 - 19:30</option>
+                    <option value="20:00 - 21:30">20:00 - 21:30</option>
                   </select>
                 </div>
               </div>
 
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.4rem' }}>
-                  Priority
-                </label>
+              <div className="form-group">
+                <label>Priority</label>
                 <select 
                   value={priority} 
                   onChange={e => setPriority(e.target.value)}
-                  style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}
                 >
-                  <option style={{ background: '#1c1917' }} value="High">High</option>
-                  <option style={{ background: '#1c1917' }} value="Medium">Medium</option>
-                  <option style={{ background: '#1c1917' }} value="Low">Low</option>
+                  <option value="High">High</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Low">Low</option>
                 </select>
               </div>
 
-              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <div className="modal-actions-row">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowManualModal(false)}>
                   Cancel
                 </button>

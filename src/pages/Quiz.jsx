@@ -26,17 +26,15 @@ function Quiz() {
   // Adaptive recommendation state
   const [isStrugglingUser, setIsStrugglingUser] = useState(false)
 
+  // Elapsed Timer state
+  const [secondsElapsed, setSecondsElapsed] = useState(0)
+
   // Tracking Refs
   const tabSwitchesRef = useRef(0)
   const clicksRef = useRef(0)
   const startTimeRef = useRef(0)
   const lastActivityRef = useRef(0)
   const inactivityAccumulatorRef = useRef(0)
-
-  // Load quizzes, subjects, and user recommendations
-  useEffect(() => {
-    loadCatalogData()
-  }, [])
 
   const loadCatalogData = async () => {
     setLoading(true)
@@ -71,9 +69,22 @@ function Quiz() {
     }
   }
 
-  // Active tracking listeners
+  // Load quizzes, subjects, and user recommendations
   useEffect(() => {
-    if (!selectedQuiz || showScore) return
+    const timer = setTimeout(() => {
+      loadCatalogData()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [])
+
+  // Active tracking listeners & Visible Timer
+  useEffect(() => {
+    if (!selectedQuiz || showScore) {
+      const timer = setTimeout(() => {
+        setSecondsElapsed(0)
+      }, 0)
+      return () => clearTimeout(timer)
+    }
 
     // Reset tracking counters
     tabSwitchesRef.current = 0
@@ -100,10 +111,15 @@ function Quiz() {
     // Inactivity check every 500ms
     const interval = setInterval(() => {
       const idleTime = getTimestamp() - lastActivityRef.current
-      if (idleTime > 4000) { // user idle for > 4s
+      if (idleTime > 4000) {
         inactivityAccumulatorRef.current += 0.5
       }
     }, 500)
+
+    // Elapsed visual timer interval (seconds)
+    const visualTimer = setInterval(() => {
+      setSecondsElapsed(prev => prev + 1)
+    }, 1000)
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
     document.addEventListener('click', handleDocClick)
@@ -116,6 +132,7 @@ function Quiz() {
       document.removeEventListener('mousemove', handleActivity)
       document.removeEventListener('keydown', handleActivity)
       clearInterval(interval)
+      clearInterval(visualTimer)
     }
   }, [selectedQuiz, showScore])
 
@@ -129,7 +146,6 @@ function Quiz() {
     setSelectedMultiOptions([])
     setShownHint(false)
     
-    // Check if user has weak grades in this subject to toggle hints
     fetchRecommendations()
       .then(rec => {
         const isWeak = rec.weak_topics.some(t => t.toLowerCase() === quiz.subject_id)
@@ -155,11 +171,9 @@ function Quiz() {
     } else {
       // MCQ or True/False - single choice
       if (isStrugglingUser) {
-        // Struggling students get detailed explanation screen before next question
         setSelectedMultiOptions([optionIndex])
         setHasConfirmedAnswer(true)
       } else {
-        // Focused/Bored users skip explanation screen instantly for speed
         const updated = [...userAnswers, optionIndex]
         setUserAnswers(updated)
         advanceQuiz(updated)
@@ -216,7 +230,6 @@ function Quiz() {
         setResult(res)
         setShowScore(true)
         setLoading(false)
-        // Fire custom profile update event to keep layout synchronized
         window.dispatchEvent(new Event('profile-updated'))
       })
       .catch(err => {
@@ -233,6 +246,13 @@ function Quiz() {
     setHasConfirmedAnswer(false)
     setSelectedMultiOptions([])
     setShownHint(false)
+  }
+
+  // Format visual timer helper
+  const formatTime = (totalSeconds) => {
+    const minutes = Math.floor(totalSeconds / 60)
+    const seconds = totalSeconds % 60
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
   }
 
   // Filter quizzes catalog list
@@ -259,7 +279,7 @@ function Quiz() {
         <div className="dashboard-header-container">
           <h1>Subject Quizzes</h1>
         </div>
-        <div className="quiz-container error-container glass-card">
+        <div className="error-container card">
           <p className="error-message">{error}</p>
           <button className="btn btn-primary" onClick={loadCatalogData}>Retry Connection</button>
         </div>
@@ -272,15 +292,18 @@ function Quiz() {
     return (
       <div className="page quiz-page">
         <div className="dashboard-header-container">
-          <h1>Course Quizzes & Assessments</h1>
-          <p className="dashboard-subtitle">Select a quiz to test your knowledge. The engine tracks behavioral stats to calibrate study recommendations.</p>
+          <h1>Assessments & Quizzes</h1>
+          <p className="dashboard-subtitle">
+            Select a quiz to test your skill level. The ML system adjusts future difficulties and paths based on your response behaviors.
+          </p>
         </div>
 
         {/* Filter Toolbar */}
-        <div className="search-filter-panel glass-card">
+        <div className="search-filter-panel">
           <div className="form-group flex-1">
-            <label>Filter by Subject</label>
+            <label htmlFor="filter-subject">Filter by Subject</label>
             <select 
+              id="filter-subject"
               value={selectedSubjectFilter} 
               onChange={(e) => setSelectedSubjectFilter(e.target.value)}
             >
@@ -292,8 +315,9 @@ function Quiz() {
           </div>
 
           <div className="form-group flex-1">
-            <label>Filter by Difficulty</label>
+            <label htmlFor="filter-difficulty">Filter by Difficulty</label>
             <select 
+              id="filter-difficulty"
               value={selectedDifficultyFilter} 
               onChange={(e) => setSelectedDifficultyFilter(e.target.value)}
             >
@@ -306,14 +330,14 @@ function Quiz() {
         </div>
 
         {filteredQuizzes.length === 0 ? (
-          <div className="empty-catalog-message glass-card">
+          <div className="empty-catalog-message card">
             <h3>No quizzes match your filters</h3>
             <p>Try resetting the subject or difficulty options to view other assessments.</p>
           </div>
         ) : (
           <div className="quiz-grid">
             {filteredQuizzes.map((quiz) => (
-              <div key={quiz.quiz_id} className="quiz-card glass-card">
+              <div key={quiz.quiz_id} className="quiz-card">
                 <div className="quiz-card-header">
                   <span className="subject-category-badge">{quiz.topic}</span>
                   <span className={`difficulty-badge ${quiz.difficulty.toLowerCase()}`}>
@@ -324,7 +348,7 @@ function Quiz() {
                 <p className="quiz-desc">{quiz.description}</p>
                 <div className="quiz-meta-row">
                   <span>Questions: <strong>{quiz.questions.length}</strong></span>
-                  <span className="quiz-subject-label">
+                  <span>
                     Subject: <strong>{subjects.find(s => s.id === quiz.subject_id)?.title || quiz.subject_id}</strong>
                   </span>
                 </div>
@@ -342,200 +366,229 @@ function Quiz() {
   // Active quiz playing view
   const q = selectedQuiz.questions[currentQuestion]
   const isMulti = q.type === 'Multi-select'
+  const progressPercent = Math.round(((currentQuestion + 1) / selectedQuiz.questions.length) * 100)
 
   return (
     <div className="page quiz-page">
-      <div className="dashboard-header-container">
-        <h1>{selectedQuiz.title}</h1>
-        <p className="dashboard-subtitle">Question {currentQuestion + 1} of {selectedQuiz.questions.length}</p>
-      </div>
+      <div className="quiz-play-layout">
+        
+        {/* Top bar with progress indicator, timer, and difficulty badge */}
+        <div className="quiz-top-bar">
+          <div className="bar-left">
+            <span className={`difficulty-badge ${selectedQuiz.difficulty.toLowerCase()}`}>
+              {selectedQuiz.difficulty} Difficulty
+            </span>
+            <span className="quiz-topic-text">{selectedQuiz.topic}</span>
+          </div>
 
-      <div className="quiz-active-container glass-card">
+          <div className="bar-center">
+            {/* Visual Progress Indicator */}
+            <div className="progress-bar-wrap">
+              <span className="progress-text">Question {currentQuestion + 1} of {selectedQuiz.questions.length}</span>
+              <div className="bar-bg">
+                <div className="bar-fill" style={{ width: `${progressPercent}%` }}></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bar-right">
+            {/* Timer Display */}
+            <div className="timer-badge">
+              <span className="timer-icon">⏱️</span>
+              <span className="timer-val">{formatTime(secondsElapsed)}</span>
+            </div>
+          </div>
+        </div>
+
         {loading ? (
-          <div className="quiz-loader">
-            <div className="spinner"></div>
-            <p>Grading responses and updating student recommendations...</p>
+          <div className="quiz-active-container card">
+            <div className="quiz-loader">
+              <div className="spinner"></div>
+              <p>Grading responses and updating student recommendations...</p>
+            </div>
           </div>
         ) : showScore && result ? (
           /* SCORE RESULTS SCREEN */
-          <div className="score-section">
-            <h2>Assessment Finished!</h2>
-            
-            <div className="results-grid">
-              <div className="result-metric-card">
-                <h3>Score</h3>
-                <p className="percentage">{result.percentage}%</p>
-                <p className="final-score">
-                  You scored {result.score} out of {result.total}
-                </p>
+          <div className="quiz-active-container card">
+            <div className="score-section">
+              <span className="trophy-icon">🏆</span>
+              <h2>Assessment Finished!</h2>
+              
+              <div className="results-grid">
+                <div className="result-metric-card">
+                  <h3>Score Achieved</h3>
+                  <p className="percentage">{result.percentage}%</p>
+                  <p className="final-score">
+                    Correct answers: {result.score} / {result.total}
+                  </p>
+                </div>
+
+                <div className={`result-metric-card engagement-card ${result.engagement_level.toLowerCase()}`}>
+                  <h3>Engagement Profile</h3>
+                  <p className="engagement-value">{result.engagement_level}</p>
+                  <p className="confidence-value">Engine Confidence: {result.confidence}%</p>
+                </div>
               </div>
 
-              <div className={`result-metric-card engagement-card ${result.engagement_level.toLowerCase()}`}>
-                <h3>Engagement Level</h3>
-                <p className="engagement-value">{result.engagement_level}</p>
-                <p className="confidence-value">Confidence: {result.confidence}%</p>
+              <div className="feedback-section">
+                <h3>AI Recommendation Insights</h3>
+                {result.engagement_level === 'Focused' && (
+                  <p className="feedback-text">
+                    🌟 <strong>High Focus!</strong> You maintained steady pacing and did not switch browser tabs. We recommend attempting **Advanced** difficulty challenges in this subject area!
+                  </p>
+                )}
+                {result.engagement_level === 'Struggling' && (
+                  <p className="feedback-text">
+                    🧠 <strong>Adaptive Hints Enabled!</strong> You focused well but struggled with the timing. For your next quiz, we've unlocked interactive guides and hints to reinforce concepts.
+                  </p>
+                )}
+                {result.engagement_level === 'Bored' && (
+                  <p className="feedback-text">
+                    💤 <strong>Pace Accelerated!</strong> We detected rapid clicking and signs of low engagement. We suggest testing yourself against a **Competition challenge**!
+                  </p>
+                )}
               </div>
-            </div>
 
-            <div className="feedback-section">
-              <h3>Personalized Path Feedback</h3>
-              {result.engagement_level === 'Focused' && (
-                <p className="feedback-text">
-                  🌟 <strong>Outstanding focus!</strong> You were highly engaged throughout the assessment. 
-                  Try unlocking a higher difficulty quiz or take a challenge in the **Competitions** menu!
-                </p>
-              )}
-              {result.engagement_level === 'Struggling' && (
-                <p className="feedback-text">
-                  🧠 <strong>Support Enabled!</strong> You showed steady focus, but spent more time on some questions. 
-                  We will enable inline hints and detailed explanations on your next beginner quizzes.
-                </p>
-              )}
-              {result.engagement_level === 'Bored' && (
-                <p className="feedback-text">
-                  💤 <strong>Let's level up!</strong> We detected fast clicks or frequent distractions. 
-                  We suggest switching to **Advanced** assessments or joining a **Competition Challenge** to test yourself.
-                </p>
-              )}
-            </div>
-
-            <div className="results-actions">
-              <button className="btn btn-primary" onClick={handleRestart}>
-                Browse Quizzes Catalog
-              </button>
+              <div className="results-actions">
+                <button className="btn btn-primary" onClick={handleRestart}>
+                  Browse Quizzes Catalog
+                </button>
+              </div>
             </div>
           </div>
         ) : (
-          /* ACTIVE QUESTIONS SCREEN */
-          <div className="question-section-display">
-            <div className="question-header-display">
-              <span className={`difficulty-badge ${selectedQuiz.difficulty.toLowerCase()}`}>
-                {selectedQuiz.difficulty}
-              </span>
-              <span className="question-type-badge">{q.type}</span>
-            </div>
-
-            <h2 className="question-text">{q.question}</h2>
-
-            {/* Render choices */}
-            <div className="options-container">
-              {q.type === 'True/False' ? (
-                // True/False buttons
-                <div className="tf-options-row">
-                  {['True', 'False'].map((label, idx) => (
-                    <button
-                      key={idx}
-                      className={`option-btn option-btn-tf ${
-                        hasConfirmedAnswer && selectedMultiOptions.includes(idx) ? 'selected' : ''
-                      }`}
-                      disabled={hasConfirmedAnswer}
-                      onClick={() => handleSelectOption(idx)}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              ) : isMulti ? (
-                // Multi-select Checkboxes
-                <div className="options-list">
-                  {q.options.map((option, idx) => (
-                    <label 
-                      key={idx} 
-                      className={`option-checkbox-label ${
-                        selectedMultiOptions.includes(idx) ? 'checked' : ''
-                      } ${hasConfirmedAnswer ? 'disabled-label' : ''}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedMultiOptions.includes(idx)}
-                        disabled={hasConfirmedAnswer}
-                        onChange={() => handleSelectOption(idx)}
-                      />
-                      <span>{option}</span>
-                    </label>
-                  ))}
-                </div>
-              ) : (
-                // MCQ Radio buttons
-                <div className="options-list">
-                  {q.options.map((option, idx) => (
-                    <button
-                      key={idx}
-                      className={`option-btn ${
-                        hasConfirmedAnswer && selectedMultiOptions.includes(idx) ? 'selected' : ''
-                      }`}
-                      disabled={hasConfirmedAnswer}
-                      onClick={() => handleSelectOption(idx)}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Multi-select confirm button */}
-            {isMulti && !hasConfirmedAnswer && (
-              <div className="confirm-btn-container">
-                <button
-                  className="btn btn-primary"
-                  onClick={handleConfirmMultiSelect}
-                  disabled={selectedMultiOptions.length === 0}
-                >
-                  Confirm Selection
-                </button>
+          /* ACTIVE QUESTIONS SCREEN - Focused reading experience */
+          <div className="quiz-active-container card">
+            <div className="question-focused-block">
+              <div className="question-number-badge">
+                Question {currentQuestion + 1}
               </div>
-            )}
+              
+              <h2 className="question-title-text">{q.question}</h2>
 
-            {/* ADAPTIVE HELPERS: Hint trigger for struggling students */}
-            {isStrugglingUser && q.hint && !hasConfirmedAnswer && (
-              <div className="hint-adaptive-container">
-                {shownHint ? (
-                  <div className="hint-box glass-card">
-                    <strong>💡 Hint:</strong> {q.hint}
+              {isMulti && (
+                <p className="question-type-hint">Select all correct options that apply, then click "Confirm Selection".</p>
+              )}
+
+              {/* Render choices in a clean, spaced layout */}
+              <div className="options-container">
+                {q.type === 'True/False' ? (
+                  <div className="tf-options-row">
+                    {['True', 'False'].map((label, idx) => (
+                      <button
+                        key={idx}
+                        className={`option-btn option-tf-btn ${
+                          hasConfirmedAnswer && selectedMultiOptions.includes(idx) ? 'selected' : ''
+                        }`}
+                        disabled={hasConfirmedAnswer}
+                        onClick={() => handleSelectOption(idx)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                ) : isMulti ? (
+                  <div className="options-list">
+                    {q.options.map((option, idx) => (
+                      <label 
+                        key={idx} 
+                        className={`option-checkbox-wrapper ${
+                          selectedMultiOptions.includes(idx) ? 'checked' : ''
+                        } ${hasConfirmedAnswer ? 'disabled-label' : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedMultiOptions.includes(idx)}
+                          disabled={hasConfirmedAnswer}
+                          onChange={() => handleSelectOption(idx)}
+                          className="checkbox-control"
+                        />
+                        <span className="checkbox-text">{option}</span>
+                      </label>
+                    ))}
                   </div>
                 ) : (
-                  <button 
-                    type="button" 
-                    className="btn btn-secondary btn-hint"
-                    onClick={() => setShownHint(true)}
-                  >
-                    Request Hint 💡
-                  </button>
+                  <div className="options-list">
+                    {q.options.map((option, idx) => (
+                      <button
+                        key={idx}
+                        className={`option-btn ${
+                          selectedMultiOptions.includes(idx) ? 'selected' : ''
+                        }`}
+                        disabled={hasConfirmedAnswer}
+                        onClick={() => handleSelectOption(idx)}
+                      >
+                        <span className="option-letter">{String.fromCharCode(65 + idx)}</span>
+                        <span className="option-text">{option}</span>
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
-            )}
 
-            {/* ADAPTIVE HELPERS: Post-explanation screen */}
-            {hasConfirmedAnswer && (
-              <div className="explanation-adaptive-container glass-card">
-                <h3>Question Grading & Explanation</h3>
-                <div className="grading-status-row">
-                  {isMulti ? (
-                    // Show partial grading feedback
-                    <p className="grading-feedback-partial">
-                      Answers recorded. Review the explanation below before moving on.
-                    </p>
+              {/* Multi-select confirm button */}
+              {isMulti && !hasConfirmedAnswer && (
+                <div className="confirm-btn-container">
+                  <button
+                    className="btn btn-primary btn-confirm-multi"
+                    onClick={handleConfirmMultiSelect}
+                    disabled={selectedMultiOptions.length === 0}
+                  >
+                    Confirm Selection
+                  </button>
+                </div>
+              )}
+
+              {/* ADAPTIVE HELPERS: Hint trigger for struggling students */}
+              {isStrugglingUser && q.hint && !hasConfirmedAnswer && (
+                <div className="hint-adaptive-container">
+                  {shownHint ? (
+                    <div className="hint-box-display">
+                      <span className="hint-title">💡 Hint:</span>
+                      <p>{q.hint}</p>
+                    </div>
                   ) : (
-                    // Show MCQ status
-                    <p className={`grading-feedback ${selectedMultiOptions[0] === q.correct ? 'correct' : 'incorrect'}`}>
-                      {selectedMultiOptions[0] === q.correct 
-                        ? '✓ Correct Answer!' 
-                        : `✗ Incorrect. Correct option was: ${q.options[q.correct]}`
-                      }
-                    </p>
+                    <button 
+                      type="button" 
+                      className="btn btn-secondary btn-hint-request"
+                      onClick={() => setShownHint(true)}
+                    >
+                      Need a Hint? Click Here 💡
+                    </button>
                   )}
                 </div>
-                {q.explanation && (
-                  <p className="explanation-text-display">
-                    <strong>Explanation:</strong> {q.explanation}
-                  </p>
-                )}
-                <button className="btn btn-primary next-question-btn" onClick={handleNextQuestionAfterExplanation}>
-                  Next Question ❯
-                </button>
-              </div>
-            )}
+              )}
+
+              {/* ADAPTIVE HELPERS: Post-explanation screen */}
+              {hasConfirmedAnswer && (
+                <div className="explanation-adaptive-container">
+                  <div className="grading-banner">
+                    {isMulti ? (
+                      <p className="grading-feedback-partial">
+                        Selection recorded. Review explanation before proceeding.
+                      </p>
+                    ) : (
+                      <p className={`grading-feedback-flag ${selectedMultiOptions[0] === q.correct ? 'correct' : 'incorrect'}`}>
+                        {selectedMultiOptions[0] === q.correct 
+                          ? '✓ Correct Answer!' 
+                          : `✗ Incorrect. Correct answer: ${q.options[q.correct]}`
+                        }
+                      </p>
+                    )}
+                  </div>
+                  {q.explanation && (
+                    <div className="explanation-text-display">
+                      <h4>Explanation:</h4>
+                      <p>{q.explanation}</p>
+                    </div>
+                  )}
+                  <button className="btn btn-primary next-question-btn" onClick={handleNextQuestionAfterExplanation}>
+                    Next Question ❯
+                  </button>
+                </div>
+              )}
+
+            </div>
           </div>
         )}
       </div>
