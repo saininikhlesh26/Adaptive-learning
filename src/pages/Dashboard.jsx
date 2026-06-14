@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { fetchDashboardStats, fetchProfile, fetchRecommendations, fetchSubjects } from '../api'
+import { 
+  fetchDashboardStats, 
+  fetchProfile, 
+  fetchRecommendations, 
+  fetchSubjects,
+  fetchTasks,
+  updateTask,
+  createTask,
+  fetchGoals,
+  fetchTimetable
+} from '../api'
 
 function Dashboard() {
   const [stats, setStats] = useState(null)
@@ -9,6 +19,12 @@ function Dashboard() {
   const [bookmarkedSubjects, setBookmarkedSubjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [tasks, setTasks] = useState([])
+  const [goals, setGoals] = useState([])
+  const [achievements, setAchievements] = useState([])
+  const [timetable, setTimetable] = useState([])
+  const [quickTaskTitle, setQuickTaskTitle] = useState('')
+  const [subjects, setSubjects] = useState([])
 
   useEffect(() => {
     loadDashboardData()
@@ -22,12 +38,20 @@ function Dashboard() {
       fetchProfile(),
       fetchDashboardStats(),
       fetchRecommendations().catch(() => null),
-      fetchSubjects().catch(() => [])
+      fetchSubjects().catch(() => []),
+      fetchTasks().catch(() => []),
+      fetchGoals().catch(() => ({ goals: [], achievements: [] })),
+      fetchTimetable().catch(() => [])
     ])
-      .then(([profileData, statsData, recData, subjectsData]) => {
+      .then(([profileData, statsData, recData, subjectsData, tasksData, goalsData, timetableData]) => {
         setProfile(profileData)
         setStats(statsData)
         setRecommendations(recData)
+        setSubjects(subjectsData)
+        setTasks(tasksData)
+        setGoals(goalsData.goals || [])
+        setAchievements(goalsData.achievements || [])
+        setTimetable(timetableData)
         
         // Filter bookmarked subjects from catalog
         const bookmarked = subjectsData.filter(s => s.is_bookmarked)
@@ -298,6 +322,33 @@ function Dashboard() {
     )
   }
 
+  const getTodayTimetable = () => {
+    const todayStr = new Date().toISOString().split('T')[0]
+    return timetable.filter(slot => slot.date === todayStr)
+  }
+
+  const handleToggleTask = async (taskId, currentStatus) => {
+    const newStatus = currentStatus === 'Completed' ? 'Pending' : 'Completed'
+    try {
+      await updateTask(taskId, { status: newStatus })
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t))
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const handleQuickTaskSubmit = async (e) => {
+    e.preventDefault()
+    if (!quickTaskTitle.trim()) return
+    try {
+      const newTask = await createTask({ title: quickTaskTitle.trim(), priority: 'Medium' })
+      setTasks(prev => [...prev, newTask])
+      setQuickTaskTitle('')
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
   return (
     <div className="page dashboard-page">
       <div className="dashboard-header-container">
@@ -364,6 +415,154 @@ function Dashboard() {
           <p className="chart-subtitle-desc">Mastery radar scores per active learning topic</p>
           <div className="chart-render-box radar-render">
             {renderSubjectRadarChart()}
+          </div>
+        </div>
+      </div>
+
+      {/* Dynamic Extensions Grid: Timetable, Tasks, Goals & Achievements */}
+      <div className="dashboard-extensions-grid">
+        {/* Today's Timetable Widget */}
+        <div className="dashboard-widget-card glass-card">
+          <div className="widget-header-row">
+            <h3>Today's Study Plan 📅</h3>
+            <Link to="/timetable" className="btn btn-secondary widget-action-btn">Go to Planner</Link>
+          </div>
+          
+          <div className="today-slots-widget-list">
+            {getTodayTimetable().length > 0 ? (
+              getTodayTimetable().map(slot => (
+                <div key={slot.id} className="today-slot-row">
+                  <div className="today-slot-left">
+                    <span className="today-slot-time-text">{slot.time_slot}</span>
+                    <span className="today-slot-subject-text">
+                      {subjects.find(s => s.id === slot.subject_id)?.title || slot.subject_id.toUpperCase()}
+                    </span>
+                    <span className="today-slot-topic-text">{slot.topic}</span>
+                  </div>
+                  <span className={`slot-priority-badge priority-${slot.priority.toLowerCase()}`}>
+                    {slot.priority}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                No study sessions scheduled for today. Rest day! 🧘‍♂️
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Task Checklist Widget */}
+        <div className="dashboard-widget-card glass-card">
+          <div className="widget-header-row">
+            <h3>Checklist Tracker 📝</h3>
+            <span className="sidebar-user-role" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>
+              {tasks.filter(t => t.status === 'Completed').length}/{tasks.length} Completed
+            </span>
+          </div>
+
+          <div className="widget-items-list" style={{ maxHeight: '220px', overflowY: 'auto', marginBottom: '1rem' }}>
+            {tasks.length > 0 ? (
+              tasks.map(task => (
+                <div key={task.id} className={`task-item-row ${task.status === 'Completed' ? 'task-completed' : ''}`}>
+                  <div className="task-left-block">
+                    <input 
+                      type="checkbox" 
+                      checked={task.status === 'Completed'} 
+                      onChange={() => handleToggleTask(task.id, task.status)}
+                      className="task-checkbox-input"
+                    />
+                    <div className="task-text-info">
+                      <span className="task-title-text">{task.title}</span>
+                      {task.due_date && <span className="task-due-date-text">Due: {task.due_date}</span>}
+                    </div>
+                  </div>
+                  <span className={`slot-priority-badge priority-${task.priority?.toLowerCase() || 'medium'}`}>
+                    {task.priority || 'Medium'}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                No tasks in checklist. Add one below!
+              </div>
+            )}
+          </div>
+
+          <form onSubmit={handleQuickTaskSubmit} style={{ display: 'flex', gap: '0.5rem' }}>
+            <input 
+              type="text" 
+              placeholder="Add quick study task..." 
+              value={quickTaskTitle}
+              onChange={e => setQuickTaskTitle(e.target.value)}
+              style={{ flexGrow: 1, padding: '0.5rem 0.75rem', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', color: 'white', fontSize: '0.85rem' }}
+            />
+            <button type="submit" className="btn btn-secondary" style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }}>Add</button>
+          </form>
+        </div>
+
+        {/* Study Goals Widget */}
+        <div className="dashboard-widget-card glass-card">
+          <div className="widget-header-row">
+            <h3>Active Study Goals 🎯</h3>
+          </div>
+
+          <div className="widget-items-list" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+            {goals.length > 0 ? (
+              goals.map(goal => {
+                const percent = Math.min(100, Math.round((goal.current_value / goal.target_value) * 100))
+                return (
+                  <div key={goal.id} className="goal-progress-card">
+                    <div className="goal-info-header">
+                      <span className="goal-title-text">{goal.title}</span>
+                      <span className="goal-progress-ratio">{percent}%</span>
+                    </div>
+                    <div className="goal-progress-bar-container">
+                      <div className="goal-progress-bar-fill" style={{ width: `${percent}%` }}></div>
+                    </div>
+                    <div className="goal-details-footer">
+                      <span>Type: {goal.goal_type}</span>
+                      {goal.deadline && <span>Target: {goal.deadline}</span>}
+                    </div>
+                  </div>
+                )
+              })
+            ) : (
+              <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                No active goals. Set goals in your profile!
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Achievements Shelf Widget */}
+        <div className="dashboard-widget-card glass-card">
+          <div className="widget-header-row">
+            <h3>Achievements & Badges 🏆</h3>
+          </div>
+
+          <div className="achievements-scrolling-container">
+            {achievements.length > 0 ? (
+              achievements.map(badge => (
+                <div key={badge.id} className="achievement-badge-card">
+                  <span className="achievement-badge-card-icon">{badge.icon}</span>
+                  <span className="achievement-badge-card-title">{badge.title}</span>
+                  <span className="achievement-badge-card-desc">{badge.description}</span>
+                </div>
+              ))
+            ) : (
+              <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)', width: '100%' }}>
+                Start completing goals and quizzes to unlock badges! 🏆
+              </div>
+            )}
+          </div>
+          
+          <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <span className="pref-label" style={{ display: 'block', fontSize: '0.75rem' }}>Weekly Learning Report</span>
+              <span style={{ fontSize: '0.9rem', color: 'white', fontWeight: 'bold' }}>Review stats & AI insights</span>
+            </div>
+            <Link to="/reports" className="btn btn-ai-planner" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>View Reports ❯</Link>
           </div>
         </div>
       </div>

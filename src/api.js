@@ -171,6 +171,144 @@ const MOCK_RECOMMENDATION = {
   quiz_details: { title: 'Data Structures: Arrays & Linked Lists', difficulty: 'Beginner' }
 };
 
+// --- Local Browser Fallbacks for new features ---
+
+const MOCK_WEEKLY_REPORTS = [
+  {
+    id: 'report_1',
+    user_id: 'usr_student_adaptive_com',
+    week_start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    week_end: new Date().toISOString().split('T')[0],
+    study_hours: 8.5,
+    study_hours_change: 1.2,
+    quizzes_attempted: 3,
+    quizzes_attempted_change: 1,
+    questions_solved: 60,
+    avg_score: 71.6,
+    avg_score_change: 5.4,
+    engagement_score: 82.5,
+    learning_streak: 4,
+    best_subject: 'python',
+    weakest_subject: 'data_structures',
+    subject_performance: { python: 90.0, math: 75.0, data_structures: 50.0 },
+    ai_insights: {
+      strengths: [
+        'Strong conceptual grasp of Python syntax & data structures.',
+        'High scoring consistency on introductory Algebra.'
+      ],
+      improvements: [
+        'Linked lists execution time is slightly high, suggesting focus on pointer traversals.',
+        'Consistent tab-switches in Data Structures quizzes denote potential distraction.'
+      ],
+      recommendations: [
+        'Allocate 45 minutes to "Data Structures: Arrays & Linked Lists" topic.',
+        'Join the Weekly Physics Cup competition to challenge your reasoning skills.'
+      ]
+    }
+  }
+];
+
+const MOCK_TIMETABLES = [
+  {
+    id: 'time_1',
+    user_id: 'usr_student_adaptive_com',
+    subject_id: 'python',
+    topic: 'Decorators & OOP',
+    date: new Date().toISOString().split('T')[0],
+    time_slot: '10:00 - 11:30',
+    priority: 'High',
+    is_ai_generated: false
+  },
+  {
+    id: 'time_2',
+    user_id: 'usr_student_adaptive_com',
+    subject_id: 'math',
+    topic: 'Calculus & Limits',
+    date: new Date().toISOString().split('T')[0],
+    time_slot: '14:00 - 15:30',
+    priority: 'Medium',
+    is_ai_generated: true
+  }
+];
+
+const MOCK_TASKS = [
+  {
+    id: 'task_1',
+    user_id: 'usr_student_adaptive_com',
+    title: 'Complete Algebra Foundations Quiz 1',
+    description: 'Solve quadratic equations practice problems.',
+    status: 'Completed',
+    due_date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    priority: 'High',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'task_2',
+    user_id: 'usr_student_adaptive_com',
+    title: 'Study Python list comprehensions and generators',
+    description: 'Watch tutorials and write basic scripts.',
+    status: 'In Progress',
+    due_date: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    priority: 'Medium',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'task_3',
+    user_id: 'usr_student_adaptive_com',
+    title: 'Prepare for Daily React Challenge',
+    description: 'Brush up on virtual DOM principles and hooks.',
+    status: 'Pending',
+    due_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    priority: 'High',
+    created_at: new Date().toISOString()
+  }
+];
+
+const MOCK_GOALS = [
+  {
+    id: 'goal_1',
+    user_id: 'usr_student_adaptive_com',
+    title: 'Master Python Programming',
+    subject_id: 'python',
+    target_value: 85.0,
+    current_value: 90.0,
+    goal_type: 'Quiz Score',
+    status: 'Completed',
+    deadline: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'goal_2',
+    user_id: 'usr_student_adaptive_com',
+    title: 'Learn Algorithms & Data Structures',
+    subject_id: 'data_structures',
+    target_value: 5.0,
+    current_value: 1.0,
+    goal_type: 'Quizzes Solved',
+    status: 'Active',
+    deadline: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    created_at: new Date().toISOString()
+  }
+];
+
+const MOCK_ACHIEVEMENTS = [
+  {
+    id: 'goal_crusher_1',
+    title: 'Goal Crusher',
+    description: 'Successfully completed your first study goal.',
+    icon: '🎯',
+    unlocked_at: 'June 2026'
+  },
+  {
+    id: 'quiz_starter',
+    title: 'First Step',
+    description: 'Completed your first adaptive quiz attempt.',
+    icon: '⚡',
+    unlocked_at: 'January 2026'
+  }
+];
+
+
 // --- AUTHENTICATION API ---
 
 export async function login(email, password) {
@@ -516,3 +654,310 @@ export async function adminCreateQuiz(quizData) {
     body: JSON.stringify(quizData)
   });
 }
+
+// --- WEEKLY REPORTS API ---
+
+export async function fetchWeeklyReports() {
+  try {
+    return await fetchWithRetry(`${API_BASE_URL}/api/reports/weekly`);
+  } catch (error) {
+    console.error('API Error in fetchWeeklyReports, fallback to mocks:', error);
+    return [...MOCK_WEEKLY_REPORTS];
+  }
+}
+
+export async function generateWeeklyReport() {
+  try {
+    return await fetchWithRetry(`${API_BASE_URL}/api/reports/weekly/generate`, { method: 'POST' });
+  } catch (error) {
+    console.error('API Error in generateWeeklyReport, fallback to mocks:', error);
+    const now = new Date();
+    const newReport = {
+      id: `wr_${Date.now()}`,
+      user_id: 'usr_student_adaptive_com',
+      week_start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      week_end: now.toISOString().split('T')[0],
+      study_hours: 9.8,
+      study_hours_change: 1.3,
+      quizzes_attempted: 4,
+      quizzes_attempted_change: 1,
+      questions_solved: 80,
+      avg_score: 76.5,
+      avg_score_change: 4.9,
+      engagement_score: 88.0,
+      learning_streak: 5,
+      best_subject: 'python',
+      weakest_subject: 'data_structures',
+      subject_performance: { python: 90.0, math: 80.0, data_structures: 55.0 },
+      ai_insights: {
+        strengths: [
+          'Excellent improvement in mathematical accuracy.',
+          'Consistently focused engagement rating.'
+        ],
+        improvements: [
+          'Linked list pointer traversal speeds are still low.',
+          'Slight tab switching detected during web development reviews.'
+        ],
+        recommendations: [
+          'Spend 30 minutes revising JavaScript async closures.',
+          'Attempt python beginner quiz 3 to lock in generator logic.'
+        ]
+      }
+    };
+    MOCK_WEEKLY_REPORTS.push(newReport);
+    return newReport;
+  }
+}
+
+// --- TIMETABLE API ---
+
+export async function fetchTimetable() {
+  try {
+    return await fetchWithRetry(`${API_BASE_URL}/api/timetable`);
+  } catch (error) {
+    console.error('API Error in fetchTimetable, fallback to mocks:', error);
+    return [...MOCK_TIMETABLES];
+  }
+}
+
+export async function createTimetableItem(itemData) {
+  try {
+    return await fetchWithRetry(`${API_BASE_URL}/api/timetable`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(itemData)
+    });
+  } catch (error) {
+    console.error('API Error in createTimetableItem, fallback to mocks:', error);
+    const newItem = {
+      ...itemData,
+      id: `time_${Date.now()}`,
+      user_id: 'usr_student_adaptive_com',
+      is_ai_generated: false
+    };
+    MOCK_TIMETABLES.push(newItem);
+    return newItem;
+  }
+}
+
+export async function updateTimetableItem(id, itemData) {
+  try {
+    return await fetchWithRetry(`${API_BASE_URL}/api/timetable/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(itemData)
+    });
+  } catch (error) {
+    console.error('API Error in updateTimetableItem, fallback to mocks:', error);
+    const idx = MOCK_TIMETABLES.findIndex(t => t.id === id);
+    if (idx !== -1) {
+      MOCK_TIMETABLES[idx] = { ...MOCK_TIMETABLES[idx], ...itemData };
+    }
+    return { status: 'success', message: 'Updated locally' };
+  }
+}
+
+export async function deleteTimetableItem(id) {
+  try {
+    return await fetchWithRetry(`${API_BASE_URL}/api/timetable/${id}`, { method: 'DELETE' });
+  } catch (error) {
+    console.error('API Error in deleteTimetableItem, fallback to mocks:', error);
+    const idx = MOCK_TIMETABLES.findIndex(t => t.id === id);
+    if (idx !== -1) {
+      MOCK_TIMETABLES.splice(idx, 1);
+    }
+    return { status: 'success', message: 'Deleted locally' };
+  }
+}
+
+export async function generateAiTimetable(hours) {
+  try {
+    return await fetchWithRetry(`${API_BASE_URL}/api/timetable/generate-ai`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ available_hours: hours })
+    });
+  } catch (error) {
+    console.error('API Error in generateAiTimetable, fallback to mocks:', error);
+    // Remove old AI generated items
+    for (let i = MOCK_TIMETABLES.length - 1; i >= 0; i--) {
+      if (MOCK_TIMETABLES[i].is_ai_generated) {
+        MOCK_TIMETABLES.splice(i, 1);
+      }
+    }
+    
+    // Generate new AI items
+    const now = new Date();
+    const newItems = [
+      {
+        id: `time_ai_${Date.now()}_1`,
+        user_id: 'usr_student_adaptive_com',
+        subject_id: 'data_structures',
+        topic: 'Arrays & Linked Lists',
+        date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        time_slot: '14:00 - 15:30',
+        priority: 'High',
+        is_ai_generated: true
+      },
+      {
+        id: `time_ai_${Date.now()}_2`,
+        user_id: 'usr_student_adaptive_com',
+        subject_id: 'python',
+        topic: 'Functions & Generators',
+        date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        time_slot: '18:00 - 19:30',
+        priority: 'Medium',
+        is_ai_generated: true
+      },
+      {
+        id: `time_ai_${Date.now()}_3`,
+        user_id: 'usr_student_adaptive_com',
+        subject_id: 'math',
+        topic: 'Calculus & Limits',
+        date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        time_slot: '10:00 - 11:30',
+        priority: 'Medium',
+        is_ai_generated: true
+      }
+    ];
+    
+    MOCK_TIMETABLES.push(...newItems);
+    return {
+      status: 'success',
+      message: `Successfully generated ${newItems.length} personalized study slots.`,
+      schedule: newItems
+    };
+  }
+}
+
+// --- TASKS API ---
+
+export async function fetchTasks() {
+  try {
+    return await fetchWithRetry(`${API_BASE_URL}/api/tasks`);
+  } catch (error) {
+    console.error('API Error in fetchTasks, fallback to mocks:', error);
+    return [...MOCK_TASKS];
+  }
+}
+
+export async function createTask(taskData) {
+  try {
+    return await fetchWithRetry(`${API_BASE_URL}/api/tasks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(taskData)
+    });
+  } catch (error) {
+    console.error('API Error in createTask, fallback to mocks:', error);
+    const newTask = {
+      ...taskData,
+      id: `task_${Date.now()}`,
+      user_id: 'usr_student_adaptive_com',
+      status: 'Pending',
+      created_at: new Date().toISOString()
+    };
+    MOCK_TASKS.push(newTask);
+    return newTask;
+  }
+}
+
+export async function updateTask(id, taskData) {
+  try {
+    return await fetchWithRetry(`${API_BASE_URL}/api/tasks/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(taskData)
+    });
+  } catch (error) {
+    console.error('API Error in updateTask, fallback to mocks:', error);
+    const idx = MOCK_TASKS.findIndex(t => t.id === id);
+    if (idx !== -1) {
+      MOCK_TASKS[idx] = { ...MOCK_TASKS[idx], ...taskData };
+    }
+    return { status: 'success', message: 'Updated task locally' };
+  }
+}
+
+export async function deleteTask(id) {
+  try {
+    return await fetchWithRetry(`${API_BASE_URL}/api/tasks/${id}`, { method: 'DELETE' });
+  } catch (error) {
+    console.error('API Error in deleteTask, fallback to mocks:', error);
+    const idx = MOCK_TASKS.findIndex(t => t.id === id);
+    if (idx !== -1) {
+      MOCK_TASKS.splice(idx, 1);
+    }
+    return { status: 'success', message: 'Deleted task locally' };
+  }
+}
+
+// --- GOALS API ---
+
+export async function fetchGoals() {
+  try {
+    return await fetchWithRetry(`${API_BASE_URL}/api/goals`);
+  } catch (error) {
+    console.error('API Error in fetchGoals, fallback to mocks:', error);
+    return {
+      goals: [...MOCK_GOALS],
+      achievements: [...MOCK_ACHIEVEMENTS]
+    };
+  }
+}
+
+export async function createGoal(goalData) {
+  try {
+    return await fetchWithRetry(`${API_BASE_URL}/api/goals`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(goalData)
+    });
+  } catch (error) {
+    console.error('API Error in createGoal, fallback to mocks:', error);
+    const newGoal = {
+      ...goalData,
+      id: `goal_${Date.now()}`,
+      user_id: 'usr_student_adaptive_com',
+      current_value: 0.0,
+      status: 'Active',
+      created_at: new Date().toISOString()
+    };
+    MOCK_GOALS.push(newGoal);
+    return newGoal;
+  }
+}
+
+export async function updateGoalProgress(id, progress) {
+  try {
+    return await fetchWithRetry(`${API_BASE_URL}/api/goals/${id}/progress`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ current_value: progress })
+    });
+  } catch (error) {
+    console.error('API Error in updateGoalProgress, fallback to mocks:', error);
+    const goal = MOCK_GOALS.find(g => g.id === id);
+    if (goal) {
+      goal.current_value = progress;
+      if (progress >= goal.target_value) {
+        goal.status = 'Completed';
+      }
+    }
+    return { status: 'success', message: 'Updated goal progress locally' };
+  }
+}
+
+export async function deleteGoal(id) {
+  try {
+    return await fetchWithRetry(`${API_BASE_URL}/api/goals/${id}`, { method: 'DELETE' });
+  } catch (error) {
+    console.error('API Error in deleteGoal, fallback to mocks:', error);
+    const idx = MOCK_GOALS.findIndex(g => g.id === id);
+    if (idx !== -1) {
+      MOCK_GOALS.splice(idx, 1);
+    }
+    return { status: 'success', message: 'Deleted goal locally' };
+  }
+}
+

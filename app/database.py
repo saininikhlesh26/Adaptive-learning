@@ -178,6 +178,28 @@ except Exception as e:
 def get_db():
     return db
 
+def create_indexes():
+    """
+    Creates MongoDB database indexes if not in mock mode.
+    """
+    global IS_MOCK, db
+    if IS_MOCK:
+        print("Skipping index creation in Mock mode.")
+        return
+    try:
+        print("Initializing database indexes...")
+        db.users.create_index("email", unique=True)
+        db.submissions.create_index([("user_id", 1), ("timestamp", -1)])
+        db.submissions.create_index("quiz_id")
+        db.quizzes.create_index([("subject_id", 1), ("difficulty", 1)])
+        db.timetables.create_index([("user_id", 1), ("date", 1)])
+        db.tasks.create_index([("user_id", 1), ("status", 1)])
+        db.goals.create_index([("user_id", 1), ("status", 1)])
+        db.weekly_reports.create_index([("user_id", 1), ("week_start", -1)])
+        print("Database indexes created successfully.")
+    except Exception as e:
+        print(f"Error creating database indexes: {e}")
+
 def seed_database():
     """
     Checks collections and seeds:
@@ -187,6 +209,11 @@ def seed_database():
     - Historical submissions
     - Default competitions
     """
+    try:
+        create_indexes()
+    except Exception as e:
+        print(f"Index creation failed: {e}")
+
     from app.utils.seed_generator import generate_quizzes_for_subject
     from app.utils.auth import hash_password
 
@@ -407,4 +434,177 @@ def seed_database():
             {"id": "comp_3", "title": "Mathematics League", "type": "Subject Challenge", "subject": "Mathematics", "participant_count": 85, "active": False}
         ])
         
+    # 6. Seed Tasks
+    tasks_collection = db["tasks"]
+    if tasks_collection.count_documents({}) == 0:
+        print("Seeding sample tasks...")
+        now = datetime.datetime.now(datetime.timezone.utc)
+        sample_tasks = [
+            {
+                "id": "task_1",
+                "user_id": "usr_student_adaptive_com",
+                "title": "Complete Algebra Foundations Quiz 1",
+                "description": "Solve quadratic equations practice problems.",
+                "status": "Completed",
+                "due_date": (now - datetime.timedelta(days=3)).strftime("%Y-%m-%d"),
+                "priority": "High",
+                "created_at": (now - datetime.timedelta(days=4)).isoformat()
+            },
+            {
+                "id": "task_2",
+                "user_id": "usr_student_adaptive_com",
+                "title": "Study Python list comprehensions and generators",
+                "description": "Watch tutorials and write basic scripts.",
+                "status": "In Progress",
+                "due_date": (now + datetime.timedelta(days=1)).strftime("%Y-%m-%d"),
+                "priority": "Medium",
+                "created_at": (now - datetime.timedelta(days=2)).isoformat()
+            },
+            {
+                "id": "task_3",
+                "user_id": "usr_student_adaptive_com",
+                "title": "Prepare for Daily React Challenge",
+                "description": "Brush up on virtual DOM principles and hooks.",
+                "status": "Pending",
+                "due_date": (now + datetime.timedelta(days=2)).strftime("%Y-%m-%d"),
+                "priority": "High",
+                "created_at": now.isoformat()
+            }
+        ]
+        tasks_collection.insert_many(sample_tasks)
+        # Add copies for default_student
+        for task in sample_tasks:
+            legacy_task = task.copy()
+            legacy_task["user_id"] = "default_student"
+            legacy_task["id"] = f"legacy_{task['id']}"
+            if "_id" in legacy_task:
+                del legacy_task["_id"]
+            tasks_collection.insert_one(legacy_task)
+
+    # 7. Seed Goals
+    goals_collection = db["goals"]
+    if goals_collection.count_documents({}) == 0:
+        print("Seeding sample goals...")
+        now = datetime.datetime.now(datetime.timezone.utc)
+        sample_goals = [
+            {
+                "id": "goal_1",
+                "user_id": "usr_student_adaptive_com",
+                "title": "Master Python Programming",
+                "subject_id": "python",
+                "target_value": 85.0,
+                "current_value": 90.0,
+                "goal_type": "Quiz Score",
+                "status": "Completed",
+                "deadline": (now + datetime.timedelta(days=10)).strftime("%Y-%m-%d"),
+                "created_at": (now - datetime.timedelta(days=15)).isoformat()
+            },
+            {
+                "id": "goal_2",
+                "user_id": "usr_student_adaptive_com",
+                "title": "Learn Algorithms & Data Structures",
+                "subject_id": "data_structures",
+                "target_value": 5.0,
+                "current_value": 1.0,
+                "goal_type": "Quizzes Solved",
+                "status": "Active",
+                "deadline": (now + datetime.timedelta(days=20)).strftime("%Y-%m-%d"),
+                "created_at": (now - datetime.timedelta(days=5)).isoformat()
+            }
+        ]
+        goals_collection.insert_many(sample_goals)
+        for g in sample_goals:
+            legacy_g = g.copy()
+            legacy_g["user_id"] = "default_student"
+            legacy_g["id"] = f"legacy_{g['id']}"
+            if "_id" in legacy_g:
+                del legacy_g["_id"]
+            goals_collection.insert_one(legacy_g)
+
+    # 8. Seed Weekly Reports
+    weekly_reports_collection = db["weekly_reports"]
+    if weekly_reports_collection.count_documents({}) == 0:
+        print("Seeding sample weekly report...")
+        now = datetime.datetime.now(datetime.timezone.utc)
+        week_start = (now - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
+        week_end = now.strftime("%Y-%m-%d")
+        
+        sample_report = {
+            "id": "report_1",
+            "user_id": "usr_student_adaptive_com",
+            "week_start": week_start,
+            "week_end": week_end,
+            "study_hours": 8.5,
+            "study_hours_change": 1.2,
+            "quizzes_attempted": 3,
+            "quizzes_attempted_change": 1,
+            "questions_solved": 60,
+            "avg_score": 71.6,
+            "avg_score_change": 5.4,
+            "engagement_score": 82.5,
+            "learning_streak": 4,
+            "best_subject": "python",
+            "weakest_subject": "data_structures",
+            "subject_performance": {"python": 90.0, "math": 75.0, "data_structures": 50.0},
+            "ai_insights": {
+                "strengths": [
+                    "Strong conceptual grasp of Python syntax & data structures.",
+                    "High scoring consistency on introductory Algebra."
+                ],
+                "improvements": [
+                    "Linked lists execution time is slightly high, suggesting focus on pointer traversals.",
+                    "Consistent tab-switches in Data Structures quizzes denote potential distraction."
+                ],
+                "recommendations": [
+                    "Allocate 45 minutes to 'Data Structures: Arrays & Linked Lists' topic.",
+                    "Join the Weekly Physics Cup competition to challenge your reasoning skills."
+                ]
+            }
+        }
+        weekly_reports_collection.insert_one(sample_report)
+        
+        legacy_report = sample_report.copy()
+        legacy_report["user_id"] = "default_student"
+        legacy_report["id"] = "legacy_report_1"
+        if "_id" in legacy_report:
+            del legacy_report["_id"]
+        weekly_reports_collection.insert_one(legacy_report)
+
+    # 9. Seed Study Timetable
+    timetables_collection = db["timetables"]
+    if timetables_collection.count_documents({}) == 0:
+        print("Seeding sample timetable items...")
+        now = datetime.datetime.now(datetime.timezone.utc)
+        sample_timetables = [
+            {
+                "id": "time_1",
+                "user_id": "usr_student_adaptive_com",
+                "subject_id": "python",
+                "topic": "Decorators & OOP",
+                "date": now.strftime("%Y-%m-%d"),
+                "time_slot": "10:00 - 11:30",
+                "priority": "High",
+                "is_ai_generated": False
+            },
+            {
+                "id": "time_2",
+                "user_id": "usr_student_adaptive_com",
+                "subject_id": "math",
+                "topic": "Calculus & Limits",
+                "date": now.strftime("%Y-%m-%d"),
+                "time_slot": "14:00 - 15:30",
+                "priority": "Medium",
+                "is_ai_generated": True
+            }
+        ]
+        timetables_collection.insert_many(sample_timetables)
+        for t in sample_timetables:
+            legacy_t = t.copy()
+            legacy_t["user_id"] = "default_student"
+            legacy_t["id"] = f"legacy_{t['id']}"
+            if "_id" in legacy_t:
+                del legacy_t["_id"]
+            timetables_collection.insert_one(legacy_t)
+        
     print("Database seeding completed.")
+

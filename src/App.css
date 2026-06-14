@@ -1770,3 +1770,719 @@ body {
     gap: 1rem;
   }
 }
+
+/* ==========================================================================
+   NEW MODULES - STUDY PLANNER, TASKS, GOALS & LEARNING REPORTS STYLES
+   ========================================================================== */
+
+/* 1. Study Planner & Timetable Grid */
+.planner-page-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  text-align: left;
+}
+
+.planner-controls-card {
+  padding: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.planner-title-section h1 {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: white;
+  margin-bottom: 0.25rem;
+}
+
+.planner-action-buttons {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.btn-ai-planner {
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
+  color: white !important;
+  border: none !important;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn-ai-planner:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
+}
+
+.timetable-week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 1200px) {
+  .timetable-week-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+}
+
+.timetable-day-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 250px;
+}
+
+.day-column-header {
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.day-name {
+  font-weight: bold;
+  font-size: 0.9rem;
+  color: white;
+  display: block;
+}
+
+.day-date {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.study-slot-card {
+  padding: 0.85rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  position: relative;
+  transition: transform 0.2s, border-color 0.2s;
+  cursor: pointer;
+}
+
+.study-slot-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(139, 92, 246, 0.4);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.study-slot-time {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.study-slot-subject {
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: white;
+  margin-bottom: 0.2rem;
+}
+
+.study-slot-topic {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.5rem;
+}
+
+.study-slot-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.4rem;
+}
+
+.slot-priority-badge {
+  font-size: 0.65rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.priority-high {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.priority-medium {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
+.priority-low {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.slot-ai-indicator {
+  font-size: 0.65rem;
+  background: rgba(6, 182, 212, 0.15);
+  color: var(--info);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.btn-delete-slot {
+  background: none;
+  border: none;
+  color: #ef4444;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* AI Planner Generation Overlay Modal */
+.ai-planner-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.ai-planner-dialog-card {
+  max-width: 450px;
+  width: 100%;
+  padding: 2rem;
+  text-align: left;
+}
+
+/* 2. Tasks & Goals Widgets / Dashboard Grid */
+.dashboard-extensions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+@media (max-width: 900px) {
+  .dashboard-extensions-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dashboard-widget-card {
+  padding: 1.5rem;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+}
+
+.widget-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.widget-header-row h3 {
+  font-size: 1.25rem;
+  color: white;
+  font-weight: 700;
+}
+
+.widget-action-btn {
+  font-size: 0.8rem !important;
+  padding: 0.4rem 0.8rem !important;
+}
+
+.widget-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Tasks Styling */
+.task-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  transition: background 0.2s;
+}
+
+.task-item-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.task-left-block {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-grow: 1;
+  overflow: hidden;
+}
+
+.task-checkbox-input {
+  width: 1.2rem;
+  height: 1.2rem;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.task-text-info {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  overflow: hidden;
+}
+
+.task-title-text {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: white;
+}
+
+.task-completed .task-title-text {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.task-due-date-text {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.task-right-block {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: 0.75rem;
+}
+
+.task-trash-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.95rem;
+  padding: 0.25rem;
+  border-radius: 4px;
+}
+
+.task-trash-btn:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* Goals Progression cards */
+.goal-progress-card {
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.goal-info-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.goal-title-text {
+  font-size: 0.9rem;
+  font-weight: bold;
+  color: white;
+}
+
+.goal-progress-ratio {
+  font-size: 0.8rem;
+  color: var(--primary-hover);
+  font-weight: bold;
+}
+
+.goal-progress-bar-container {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.goal-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary) 0%, var(--primary-hover) 100%);
+  border-radius: 10px;
+  transition: width 0.4s ease-out;
+}
+
+.goal-details-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Goals achievements display */
+.achievements-scrolling-container {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding: 0.25rem 0;
+  scrollbar-width: thin;
+}
+
+.achievement-badge-card {
+  flex: 0 0 160px;
+  padding: 0.85rem;
+  background: rgba(139, 92, 246, 0.05);
+  border: 1px solid rgba(139, 92, 246, 0.15);
+  border-radius: 12px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.achievement-badge-card-icon {
+  font-size: 2rem;
+}
+
+.achievement-badge-card-title {
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: white;
+}
+
+.achievement-badge-card-desc {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+/* 3. Weekly Report Analytics Layout */
+.weekly-reports-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  text-align: left;
+}
+
+.weekly-report-selector-card {
+  padding: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.report-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+}
+
+@media (max-width: 900px) {
+  .report-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .report-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.report-stat-card {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.report-stat-card-title {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.report-stat-card-value {
+  font-size: 2rem;
+  font-weight: bold;
+  color: white;
+}
+
+.report-stat-card-comparison {
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.comparison-positive {
+  color: var(--success);
+}
+
+.comparison-negative {
+  color: var(--danger);
+}
+
+.comparison-neutral {
+  color: var(--text-muted);
+}
+
+.report-double-column {
+  display: grid;
+  grid-template-columns: 1.2fr 1.8fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .report-double-column {
+    grid-template-columns: 1fr;
+  }
+}
+
+.report-ai-insights-card {
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.report-insight-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.report-insight-group-title {
+  font-size: 1rem;
+  font-weight: bold;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 0.4rem;
+}
+
+.report-insight-group-title.strengths { color: var(--success); }
+.report-insight-group-title.improvements { color: var(--info); }
+.report-insight-group-title.recommendations { color: var(--primary-hover); }
+
+.report-insight-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.report-insight-list li {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.report-insight-list li::before {
+  content: "✦";
+  font-size: 0.8rem;
+  margin-top: 0.15rem;
+}
+
+.report-insight-list.strengths-list li::before { color: var(--success); }
+.report-insight-list.improvements-list li::before { color: var(--info); }
+.report-insight-list.recommendations-list li::before { color: var(--primary-hover); }
+
+.report-subject-performance-card {
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.report-subject-bars-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.report-subject-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.report-subject-row-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.report-subject-row-title {
+  color: white;
+}
+
+.report-subject-row-score {
+  color: var(--primary-hover);
+}
+
+.report-subject-bar-container {
+  height: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.report-subject-bar-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 8px;
+  width: 0%;
+  transition: width 0.8s ease-out;
+}
+
+/* Today's Timetable Widget on Dashboard */
+.today-slots-widget-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.today-slot-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.today-slot-left {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.today-slot-time-text {
+  font-size: 0.75rem;
+  color: var(--primary-hover);
+  font-weight: bold;
+}
+
+.today-slot-subject-text {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: white;
+}
+
+.today-slot-topic-text {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   PRINT STYLING OVERRIDES (window.print() friendly styling)
+   ========================================================================== */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    font-family: 'Inter', -apple-system, sans-serif !important;
+  }
+
+  /* Hide sidebar and interaction controls during print operations */
+  aside.sidebar,
+  .sidebar,
+  .navbar,
+  .footer,
+  .planner-action-buttons,
+  .weekly-report-selector-card button,
+  .weekly-report-selector-card select,
+  .btn,
+  button,
+  a {
+    display: none !important;
+  }
+
+  /* Expand content area to full width without offsets */
+  .app-container,
+  .content-wrapper,
+  .main-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    position: static !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  /* Simplify cards and grids for printer ink efficiency */
+  .glass-card,
+  .report-stat-card,
+  .report-ai-insights-card,
+  .report-subject-performance-card {
+    background: none !important;
+    border: 1px solid #d1d5db !important;
+    box-shadow: none !important;
+    color: black !important;
+    border-radius: 8px !important;
+    page-break-inside: avoid;
+    margin-bottom: 1.5rem !important;
+    padding: 1.5rem !important;
+  }
+
+  /* Dark text overrides */
+  h1, h2, h3, h4, p, span, li, div {
+    color: #111827 !important;
+    text-shadow: none !important;
+  }
+
+  .report-stat-card-value {
+    color: #111827 !important;
+  }
+
+  .report-stat-card-title,
+  .day-date,
+  .task-due-date-text,
+  .pref-label,
+  .prog-label {
+    color: #4b5563 !important;
+  }
+
+  /* Print progress bar overrides */
+  .report-subject-bar-container,
+  .goal-progress-bar-container {
+    background: #e5e7eb !important;
+    border: 1px solid #9ca3af !important;
+    height: 12px !important;
+  }
+
+  .report-subject-bar-fill,
+  .goal-progress-bar-fill {
+    background: #4f46e5 !important; /* solid print blue */
+  }
+
+  /* Force page splits */
+  .print-page-break {
+    page-break-before: always !important;
+  }
+}
+

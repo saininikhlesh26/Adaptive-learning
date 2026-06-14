@@ -12,6 +12,9 @@ const Subjects = lazy(() => import('./pages/Subjects'))
 const Competitions = lazy(() => import('./pages/Competitions'))
 const AdminPanel = lazy(() => import('./pages/AdminPanel'))
 const Auth = lazy(() => import('./pages/Auth'))
+const WeeklyReports = lazy(() => import('./pages/WeeklyReports'))
+const Timetable = lazy(() => import('./pages/Timetable'))
+
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children, authState }) => {
@@ -101,6 +104,14 @@ function MainAppContent() {
             <Link to="/competitions" className={`menu-item ${isActive('/competitions')}`}>
               <span className="menu-icon">🏆</span>
               <span className="menu-text">Competitions</span>
+            </Link>
+            <Link to="/timetable" className={`menu-item ${isActive('/timetable')}`}>
+              <span className="menu-icon">📅</span>
+              <span className="menu-text">Study Planner</span>
+            </Link>
+            <Link to="/reports" className={`menu-item ${isActive('/reports')}`}>
+              <span className="menu-icon">📈</span>
+              <span className="menu-text">Weekly Reports</span>
             </Link>
             <Link to="/profile" className={`menu-item ${isActive('/profile')}`}>
               <span className="menu-icon">👤</span>
@@ -196,6 +207,16 @@ function MainAppContent() {
               <Route path="/profile" element={
                 <ProtectedRoute authState={authState}>
                   <Profile />
+                </ProtectedRoute>
+              } />
+              <Route path="/timetable" element={
+                <ProtectedRoute authState={authState}>
+                  <Timetable />
+                </ProtectedRoute>
+              } />
+              <Route path="/reports" element={
+                <ProtectedRoute authState={authState}>
+                  <WeeklyReports />
                 </ProtectedRoute>
               } />
 

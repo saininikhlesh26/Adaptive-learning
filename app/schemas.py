@@ -108,3 +108,89 @@ class CompetitionCreate(BaseModel):
 
 class CompetitionJoin(BaseModel):
     competition_id: str
+
+# --- Timetable Module Schemas ---
+
+class TimetableCreate(BaseModel):
+    subject_id: str
+    topic: str
+    date: str  # YYYY-MM-DD
+    time_slot: str  # e.g. "09:00 - 10:30"
+    priority: str = "Medium"  # Low, Medium, High
+
+class TimetableResponse(BaseModel):
+    id: str
+    user_id: str
+    subject_id: str
+    topic: str
+    date: str
+    time_slot: str
+    priority: str
+    is_ai_generated: bool
+
+# --- Task Module Schemas ---
+
+class TaskCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    due_date: Optional[str] = None  # YYYY-MM-DD
+    priority: str = "Medium"  # Low, Medium, High
+
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None  # Pending, In Progress, Completed
+    priority: Optional[str] = None
+
+class TaskResponse(BaseModel):
+    id: str
+    user_id: str
+    title: str
+    description: Optional[str]
+    status: str
+    due_date: Optional[str]
+    priority: str
+    created_at: str
+
+# --- Goal Module Schemas ---
+
+class GoalCreate(BaseModel):
+    title: str
+    subject_id: str
+    target_value: float  # e.g. target quiz score, target hours, or target count
+    goal_type: str = "Quiz Score"  # "Quiz Score" | "Study Hours" | "Quizzes Solved"
+    deadline: Optional[str] = None  # YYYY-MM-DD
+
+class GoalResponse(BaseModel):
+    id: str
+    user_id: str
+    title: str
+    subject_id: str
+    target_value: float
+    current_value: float
+    goal_type: str
+    status: str  # Active, Completed, Expired
+    deadline: Optional[str]
+    created_at: str
+
+# --- Weekly Report Schemas ---
+
+class WeeklyReportResponse(BaseModel):
+    id: str
+    user_id: str
+    week_start: str  # YYYY-MM-DD
+    week_end: str  # YYYY-MM-DD
+    study_hours: float
+    study_hours_change: float
+    quizzes_attempted: int
+    quizzes_attempted_change: int
+    questions_solved: int
+    avg_score: float
+    avg_score_change: float
+    engagement_score: float
+    learning_streak: int
+    subject_performance: Dict[str, float]
+    best_subject: Optional[str]
+    weakest_subject: Optional[str]
+    ai_insights: Dict[str, List[str]]
+
