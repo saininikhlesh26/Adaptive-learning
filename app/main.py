@@ -1,5 +1,6 @@
 import os
 import uvicorn
+import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -18,7 +19,7 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow any origin to communicate in public/preview deployments
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?|https://.*\.vercel\.app",
     allow_credentials=False,  # Bearer token auth in headers does not require cookies/credentials flags
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,6 +32,29 @@ def startup_event():
         seed_database()
     except Exception as e:
         print(f"Error seeding database on startup: {e}")
+
+@app.get("/api/health")
+def health_check():
+    db_status = "connected"
+    is_mock = False
+    try:
+        from app.database import get_db, IS_MOCK
+        database = get_db()
+        if IS_MOCK:
+            db_status = "mock_database_active"
+            is_mock = True
+        else:
+            # Probe connection
+            database.client.admin.command('ping')
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+    
+    return {
+        "status": "healthy",
+        "database_status": db_status,
+        "is_mock": is_mock,
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
+    }
 
 @app.get("/api")
 def read_root():

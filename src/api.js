@@ -1,4 +1,9 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+// Global placeholder to log the last API request for the Debug Panel
+if (typeof window !== 'undefined') {
+  window.lastApiRequest = window.lastApiRequest || { url: '', method: '', status: '', error: '' };
+}
 
 // --- JWT Token Management ---
 
@@ -21,6 +26,18 @@ export function isAuthenticated() {
   return !!getToken();
 }
 
+export async function checkBackendHealth() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/health`, { method: 'GET' });
+    if (res.ok) {
+      return await res.json();
+    }
+    return { status: 'offline', error: `HTTP ${res.status}` };
+  } catch (e) {
+    return { status: 'offline', error: e.message };
+  }
+}
+
 // --- Resilience Helpers (Timeout & Retries) ---
 
 async function delay(ms) {
@@ -37,6 +54,10 @@ async function fetchWithRetry(url, options = {}, retries = 2, backoff = 1000) {
     const guestErr = new Error("Guest session");
     guestErr.name = "GuestSessionError";
     throw guestErr;
+  }
+
+  if (typeof window !== 'undefined') {
+    window.lastApiRequest = { url, method: options.method || 'GET', status: 'pending', error: '' };
   }
 
   const headers = {
@@ -62,16 +83,28 @@ async function fetchWithRetry(url, options = {}, retries = 2, backoff = 1000) {
       setToken(null);
     }
 
+    if (typeof window !== 'undefined') {
+      window.lastApiRequest.status = response.status;
+    }
+
     if (!response.ok) {
       const errorText = await response.text().catch(() => '');
       let errorJson;
       try { errorJson = JSON.parse(errorText); } catch { /* ignore */ }
       const msg = errorJson?.detail || `HTTP error: status ${response.status}`;
+      if (typeof window !== 'undefined') {
+        window.lastApiRequest.error = msg;
+      }
       throw new Error(msg);
     }
     return await response.json();
   } catch (error) {
     clearTimeout(timeoutId);
+
+    if (typeof window !== 'undefined' && error.name !== 'GuestSessionError') {
+      window.lastApiRequest.status = error.status || 'failed';
+      window.lastApiRequest.error = error.message;
+    }
 
     if (retries > 0 && error.message && error.message.includes('HTTP error') === false && error.status !== 401 && error.status !== 403) {
       console.warn(`Fetch failed for ${url}. Retrying in ${backoff}ms... (${retries} attempts left). Error:`, error.message);
@@ -81,10 +114,13 @@ async function fetchWithRetry(url, options = {}, retries = 2, backoff = 1000) {
     
     // Map generic connection errors to user-friendly messages
     if (error.name === 'AbortError') {
-      throw new Error("Server is waking up. Please wait a few seconds.", { cause: error });
+      throw new Error("Server is starting, please wait (Render cold boot).", { cause: error });
     }
     if (error.message && (error.message.includes('Failed to fetch') || error.message.toLowerCase().includes('network error') || error.message.includes('NetworkError'))) {
-      throw new Error("Unable to connect to server. Please try again.", { cause: error });
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        throw new Error("Internet connection unavailable. Please check your network connection.", { cause: error });
+      }
+      throw new Error("Unable to connect to server. The backend might be offline.", { cause: error });
     }
     throw error;
   }

@@ -343,6 +343,76 @@ def seed_database():
             "enable_reminders": False
         })
 
+    # Seed required test accounts
+    if users_collection.count_documents({"email": "test@example.com"}) == 0:
+        print("Seeding test account...")
+        test_pwd_hash = hash_password("Test@123")
+        users_collection.insert_one({
+            "user_id": "usr_test_example_com",
+            "email": "test@example.com",
+            "password_hash": test_pwd_hash,
+            "first_name": "Test",
+            "last_name": "Account",
+            "avatar_url": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
+            "education_level": "Undergraduate",
+            "learning_interests": ["math", "python"],
+            "learning_goals": "Explore and test the adaptive learning platform features.",
+            "joined_date": "January 2026",
+            "role": "student",
+            "learning_style": "Visual Learner",
+            "preferred_pace": "Moderate pace",
+            "peak_time": "Evenings (6 PM - 9 PM)",
+            "weekly_goal": 10,
+            "subject_focus": "General",
+            "enable_reminders": True
+        })
+
+    if users_collection.count_documents({"email": "student@example.com"}) == 0:
+        print("Seeding student account...")
+        student_pwd_hash2 = hash_password("Student@123")
+        users_collection.insert_one({
+            "user_id": "usr_student_example_com",
+            "email": "student@example.com",
+            "password_hash": student_pwd_hash2,
+            "first_name": "Student",
+            "last_name": "User",
+            "avatar_url": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
+            "education_level": "Undergraduate",
+            "learning_interests": ["math", "python", "data_structures"],
+            "learning_goals": "Master core computational algorithms.",
+            "joined_date": "January 2026",
+            "role": "student",
+            "learning_style": "Visual Learner",
+            "preferred_pace": "Moderate pace",
+            "peak_time": "Evenings (6 PM - 9 PM)",
+            "weekly_goal": 10,
+            "subject_focus": "Computer Science",
+            "enable_reminders": True
+        })
+
+    if users_collection.count_documents({"email": "admin@example.com"}) == 0:
+        print("Seeding admin account...")
+        admin_pwd_hash2 = hash_password("Admin@123")
+        users_collection.insert_one({
+            "user_id": "usr_admin_example_com",
+            "email": "admin@example.com",
+            "password_hash": admin_pwd_hash2,
+            "first_name": "Admin",
+            "last_name": "User",
+            "avatar_url": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=200",
+            "education_level": "Professional",
+            "learning_interests": ["python", "ml"],
+            "learning_goals": "Manage and test the platform admin settings.",
+            "joined_date": "January 2026",
+            "role": "admin",
+            "learning_style": "Structured Learner",
+            "preferred_pace": "Fast pace",
+            "peak_time": "Mornings (9 AM - 12 PM)",
+            "weekly_goal": 5,
+            "subject_focus": "Administration",
+            "enable_reminders": False
+        })
+
     # Backward compatibility fallback student profile
     if users_collection.count_documents({"user_id": "default_student"}) == 0:
         print("Seeding legacy default student...")

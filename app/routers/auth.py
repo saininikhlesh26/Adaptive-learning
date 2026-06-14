@@ -114,10 +114,10 @@ def login(req: UserLogin):
     
     user = db.users.find_one({"email": email})
     if not user:
-        raise HTTPException(status_code=401, detail="Incorrect email or password")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account does not exist")
         
     if not verify_password(req.password, user.get("password_hash", "")):
-        raise HTTPException(status_code=401, detail="Incorrect email or password")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect password")
         
     # Clean user doc
     response_user = user.copy()

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { login, register, isAuthenticated } from '../api'
+import { login, register, isAuthenticated, checkBackendHealth } from '../api'
 
 const INTEREST_OPTIONS = [
   { id: 'math', label: 'Mathematics' },
@@ -40,6 +40,26 @@ function Auth({ onAuthSuccess }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const navigate = useNavigate()
+
+  const [debugOpen, setDebugOpen] = useState(false)
+  const [backendHealth, setBackendHealth] = useState(null)
+  const [lastRequest, setLastRequest] = useState(null)
+
+  useEffect(() => {
+    const verifyHealth = async () => {
+      const health = await checkBackendHealth();
+      setBackendHealth(health);
+    };
+    verifyHealth();
+
+    const interval = setInterval(() => {
+      if (typeof window !== 'undefined' && window.lastApiRequest) {
+        setLastRequest({ ...window.lastApiRequest });
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Real-time password validation checks
   const hasMinLength = password.length >= 8
@@ -269,6 +289,61 @@ function Auth({ onAuthSuccess }) {
             </button>
           </p>
         </div>
+      </div>
+
+      {/* Collapsible Floating Debug Panel */}
+      <div className={`debug-panel-widget ${debugOpen ? 'expanded' : 'collapsed'}`}>
+        <button 
+          type="button" 
+          className="debug-panel-toggle" 
+          onClick={() => setDebugOpen(!debugOpen)}
+        >
+          ⚙️ {debugOpen ? 'Hide Debug Info' : 'Show Debug Info'}
+        </button>
+        {debugOpen && (
+          <div className="debug-panel-content">
+            <h4>🔍 System Diagnostic Panel</h4>
+            <div className="debug-item">
+              <strong>Frontend API URL:</strong>
+              <code>{import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}</code>
+            </div>
+            <div className="debug-item">
+              <strong>Backend Status:</strong>
+              <span className={`badge-status ${backendHealth?.status === 'healthy' ? 'status-online' : 'status-offline'}`}>
+                {backendHealth?.status === 'healthy' ? '🟢 Online' : '🔴 Unreachable'}
+              </span>
+              {backendHealth?.is_mock && <span className="badge-mock"> (Mock DB Enabled)</span>}
+            </div>
+            <div className="debug-item">
+              <strong>Last API Request:</strong>
+              {lastRequest?.url ? (
+                <pre className="debug-pre">
+                  {lastRequest.method} {lastRequest.url.replace(/https?:\/\/[^/]+/, '')}<br/>
+                  Status: {lastRequest.status}<br/>
+                  {lastRequest.error && `Error: ${lastRequest.error}`}
+                </pre>
+              ) : (
+                <code>No API requests executed yet</code>
+              )}
+            </div>
+            <div className="debug-item">
+              <strong>Local Token:</strong>
+              <code>{localStorage.getItem('adaptive_token') ? '🔑 Token Present' : '❌ No Token'}</code>
+            </div>
+            <button 
+              type="button" 
+              className="btn btn-secondary btn-sm" 
+              style={{ marginTop: '0.5rem', width: '100%', fontSize: '0.8rem' }}
+              onClick={async () => {
+                setBackendHealth({ status: 'checking...' });
+                const health = await checkBackendHealth();
+                setBackendHealth(health);
+              }}
+            >
+              🔄 Refresh Status
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
