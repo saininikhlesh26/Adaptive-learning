@@ -29,7 +29,15 @@ async function delay(ms) {
 
 async function fetchWithRetry(url, options = {}, retries = 2, backoff = 1000) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 12000); // 12-second timeout
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30-second timeout
+
+  // Intercept requests for guests to avoid unnecessary 401 console errors
+  const isAuthPath = url.includes('/api/auth/login') || url.includes('/api/auth/register') || url.includes('/api/auth/logout');
+  if (!isAuthenticated() && !isAuthPath) {
+    const guestErr = new Error("Guest session");
+    guestErr.name = "GuestSessionError";
+    throw guestErr;
+  }
 
   const headers = {
     ...options.headers,
@@ -51,7 +59,6 @@ async function fetchWithRetry(url, options = {}, retries = 2, backoff = 1000) {
     clearTimeout(timeoutId);
 
     if (response.status === 401) {
-      // Token might be invalid or expired. Clear session.
       setToken(null);
     }
 
@@ -66,10 +73,18 @@ async function fetchWithRetry(url, options = {}, retries = 2, backoff = 1000) {
   } catch (error) {
     clearTimeout(timeoutId);
 
-    if (retries > 0 && error.message.includes('HTTP error') === false && error.status !== 401 && error.status !== 403) {
+    if (retries > 0 && error.message && error.message.includes('HTTP error') === false && error.status !== 401 && error.status !== 403) {
       console.warn(`Fetch failed for ${url}. Retrying in ${backoff}ms... (${retries} attempts left). Error:`, error.message);
       await delay(backoff);
       return fetchWithRetry(url, options, retries - 1, backoff * 2);
+    }
+    
+    // Map generic connection errors to user-friendly messages
+    if (error.name === 'AbortError') {
+      throw new Error("Server is waking up. Please wait a few seconds.", { cause: error });
+    }
+    if (error.message && (error.message.includes('Failed to fetch') || error.message.toLowerCase().includes('network error') || error.message.includes('NetworkError'))) {
+      throw new Error("Unable to connect to server. Please try again.", { cause: error });
     }
     throw error;
   }
