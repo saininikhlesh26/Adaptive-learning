@@ -407,7 +407,7 @@ const DEFAULT_ACCOUNTS = [
 // --- AUTHENTICATION API ---
 
 export async function login(email, password) {
-  const cleanEmail = email.trim().lower();
+  const cleanEmail = email.trim().toLowerCase();
   try {
     const result = await fetchWithRetry(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
@@ -461,7 +461,7 @@ export async function login(email, password) {
 }
 
 export async function register(registerData) {
-  const cleanEmail = registerData.email.trim().lower();
+  const cleanEmail = registerData.email.trim().toLowerCase();
   try {
     const result = await fetchWithRetry(`${API_BASE_URL}/api/auth/register`, {
       method: 'POST',
